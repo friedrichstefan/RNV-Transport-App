@@ -1,0 +1,13 @@
+// Debug.xcconfig
+#include "Secrets.xcconfig"
+
+// Debug-spezifische Build Settings
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ENABLE_BITCODE = NO
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG
+GCC_PREPROCESSOR_DEFINITIONS = DEBUG=1 $(inherited)
+ENABLE_TESTABILITY = YES
+
+// RNV Specific
+PRODUCT_BUNDLE_IDENTIFIER = com.stefanfriedrich.rnvapp.debug

@@ -1,0 +1,632 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		39111F8E2F1C6108002FB482 /* Debug.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8D2F1C6108002FB482 /* Debug.xcconfig */; };
+		39111F902F1C61A0002FB482 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8F2F1C61A0002FB482 /* .gitignore */; };
+		39111F9E2F1C6A1E002FB482 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 39111F9D2F1C6A1E002FB482 /* Secrets.xcconfig */; };
+		39111FA22F1C7046002FB482 /* Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 39111FA12F1C7046002FB482 /* Release.xcconfig */; };
+		395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FE92F11B3F700BC7030 /* Apollo */; };
+		395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FEB2F11B3F700BC7030 /* ApolloAPI */; };
+		395F20AA2F128DB500BC7030 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20A92F128DB500BC7030 /* WidgetKit.framework */; };
+		395F20AC2F128DB500BC7030 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20AB2F128DB500BC7030 /* SwiftUI.framework */; };
+		395F20BB2F128DB700BC7030 /* RNVLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		395F20B92F128DB700BC7030 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 395F1FCD2F11B2B000BC7030 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 395F20A62F128DB500BC7030;
+			remoteInfo = RNVLiveActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		395F20BC2F128DB700BC7030 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				395F20BB2F128DB700BC7030 /* RNVLiveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		39111F8D2F1C6108002FB482 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		39111F8F2F1C61A0002FB482 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		39111F9D2F1C6A1E002FB482 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		39111FA12F1C7046002FB482 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		395F1FD52F11B2B100BC7030 /* RNV-Transport-App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "RNV-Transport-App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RNVLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		395F20A92F128DB500BC7030 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		395F20AB2F128DB500BC7030 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		395F20C12F128DC400BC7030 /* RNVLiveActivityExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RNVLiveActivityExtension.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		395F20BF2F128DB700BC7030 /* Exceptions for "RNVLiveActivity" folder in "RNVLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 395F20A62F128DB500BC7030 /* RNVLiveActivityExtension */;
+		};
+		395F20CA2F12A67C00BC7030 /* Exceptions for "RNV-Transport-App" folder in "RNVLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				EndAllActivitiesIntent.swift,
+				LiveActivityState.swift,
+				SharedModels.swift,
+			);
+			target = 395F20A62F128DB500BC7030 /* RNVLiveActivityExtension */;
+		};
+		395F21092F17127400BC7030 /* Exceptions for "RNV-Transport-App" folder in "RNV-Transport-App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 395F1FD42F11B2B100BC7030 /* RNV-Transport-App */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		395F1FD72F11B2B100BC7030 /* RNV-Transport-App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				395F21092F17127400BC7030 /* Exceptions for "RNV-Transport-App" folder in "RNV-Transport-App" target */,
+				395F20CA2F12A67C00BC7030 /* Exceptions for "RNV-Transport-App" folder in "RNVLiveActivityExtension" target */,
+			);
+			path = "RNV-Transport-App";
+			sourceTree = "<group>";
+		};
+		395F20AD2F128DB500BC7030 /* RNVLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				395F20BF2F128DB700BC7030 /* Exceptions for "RNVLiveActivity" folder in "RNVLiveActivityExtension" target */,
+			);
+			path = RNVLiveActivity;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		395F1FD22F11B2B100BC7030 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */,
+				395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		395F20A42F128DB500BC7030 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				395F20AC2F128DB500BC7030 /* SwiftUI.framework in Frameworks */,
+				395F20AA2F128DB500BC7030 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		395F1FCC2F11B2B000BC7030 = {
+			isa = PBXGroup;
+			children = (
+				39111F8F2F1C61A0002FB482 /* .gitignore */,
+				39111F8D2F1C6108002FB482 /* Debug.xcconfig */,
+				395F20C12F128DC400BC7030 /* RNVLiveActivityExtension.entitlements */,
+				395F1FD72F11B2B100BC7030 /* RNV-Transport-App */,
+				395F20AD2F128DB500BC7030 /* RNVLiveActivity */,
+				395F20A82F128DB500BC7030 /* Frameworks */,
+				395F1FD62F11B2B100BC7030 /* Products */,
+				39111F9D2F1C6A1E002FB482 /* Secrets.xcconfig */,
+				39111FA12F1C7046002FB482 /* Release.xcconfig */,
+			);
+			sourceTree = "<group>";
+		};
+		395F1FD62F11B2B100BC7030 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				395F1FD52F11B2B100BC7030 /* RNV-Transport-App.app */,
+				395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		395F20A82F128DB500BC7030 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				395F20A92F128DB500BC7030 /* WidgetKit.framework */,
+				395F20AB2F128DB500BC7030 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		395F1FD42F11B2B100BC7030 /* RNV-Transport-App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 395F1FE52F11B2B200BC7030 /* Build configuration list for PBXNativeTarget "RNV-Transport-App" */;
+			buildPhases = (
+				395F1FD12F11B2B100BC7030 /* Sources */,
+				395F1FD22F11B2B100BC7030 /* Frameworks */,
+				395F1FD32F11B2B100BC7030 /* Resources */,
+				395F20BC2F128DB700BC7030 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				395F20BA2F128DB700BC7030 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				395F1FD72F11B2B100BC7030 /* RNV-Transport-App */,
+			);
+			name = "RNV-Transport-App";
+			packageProductDependencies = (
+				395F1FE92F11B3F700BC7030 /* Apollo */,
+				395F1FEB2F11B3F700BC7030 /* ApolloAPI */,
+			);
+			productName = "RNV-Transport-App";
+			productReference = 395F1FD52F11B2B100BC7030 /* RNV-Transport-App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		395F20A62F128DB500BC7030 /* RNVLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 395F20C02F128DB700BC7030 /* Build configuration list for PBXNativeTarget "RNVLiveActivityExtension" */;
+			buildPhases = (
+				395F20A32F128DB500BC7030 /* Sources */,
+				395F20A42F128DB500BC7030 /* Frameworks */,
+				395F20A52F128DB500BC7030 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				395F20AD2F128DB500BC7030 /* RNVLiveActivity */,
+			);
+			name = RNVLiveActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = RNVLiveActivityExtension;
+			productReference = 395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		395F1FCD2F11B2B000BC7030 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					395F1FD42F11B2B100BC7030 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					395F20A62F128DB500BC7030 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = 395F1FD02F11B2B000BC7030 /* Build configuration list for PBXProject "RNV-Transport-App" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 395F1FCC2F11B2B000BC7030;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				395F1FE82F11B3F700BC7030 /* XCRemoteSwiftPackageReference "apollo-ios" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 395F1FD62F11B2B100BC7030 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				395F1FD42F11B2B100BC7030 /* RNV-Transport-App */,
+				395F20A62F128DB500BC7030 /* RNVLiveActivityExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		395F1FD32F11B2B100BC7030 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				39111F902F1C61A0002FB482 /* .gitignore in Resources */,
+				39111F9E2F1C6A1E002FB482 /* Secrets.xcconfig in Resources */,
+				39111F8E2F1C6108002FB482 /* Debug.xcconfig in Resources */,
+				39111FA22F1C7046002FB482 /* Release.xcconfig in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		395F20A52F128DB500BC7030 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		395F1FD12F11B2B100BC7030 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		395F20A32F128DB500BC7030 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		395F20BA2F128DB700BC7030 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 395F20A62F128DB500BC7030 /* RNVLiveActivityExtension */;
+			targetProxy = 395F20B92F128DB700BC7030 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		395F1FE32F11B2B200BC7030 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 39111F8D2F1C6108002FB482 /* Debug.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = A4HCRKN53K;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				"INFOPLIST_FILE[sdk=iphoneos*]" = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				RNV_GRAPHQL_URL = "https://graphql-sandbox-dds.rnv-online.de";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		395F1FE42F11B2B200BC7030 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 39111FA12F1C7046002FB482 /* Release.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = A4HCRKN53K;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				RNV_GRAPHQL_URL = "https://graphql-sandbox-dds.rnv-online.de";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		395F1FE62F11B2B200BC7030 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 39111F8D2F1C6108002FB482 /* Debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A4HCRKN53K;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "RNV-Transport-App/Info.plist";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Wir benötigen deinen Standort für Live-Updates während deiner Fahrt.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Wir benötigen deinen Standort für Live-Updates während deiner Fahrt.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.RNV-Transport-App";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				RNV_APP_GROUP_ID = "$(RNV_APP_GROUP_ID)";
+				RNV_CLIENT_ID = "$(RNV_CLIENT_ID)";
+				RNV_CLIENT_SECRET = "$(RNV_CLIENT_SECRET)";
+				RNV_GRAPHQL_URL = "$(RNV_GRAPHQL_URL)";
+				RNV_RESOURCE = "$(RNV_RESOURCE)";
+				RNV_TENANT_ID = "$(RNV_TENANT_ID)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		395F1FE72F11B2B200BC7030 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 39111FA12F1C7046002FB482 /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A4HCRKN53K;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "RNV-Transport-App/Info.plist";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Wir benötigen deinen Standort für Live-Updates während deiner Fahrt.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Wir benötigen deinen Standort für Live-Updates während deiner Fahrt.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.RNV-Transport-App";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				RNV_APP_GROUP_ID = "$(RNV_APP_GROUP_ID)";
+				RNV_CLIENT_ID = "$(RNV_CLIENT_ID)";
+				RNV_CLIENT_SECRET = "$(RNV_CLIENT_SECRET)";
+				RNV_GRAPHQL_URL = "$(RNV_GRAPHQL_URL)";
+				RNV_RESOURCE = "$(RNV_RESOURCE)";
+				RNV_TENANT_ID = "$(RNV_TENANT_ID)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		395F20BD2F128DB700BC7030 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 39111F8D2F1C6108002FB482 /* Debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = RNVLiveActivityExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A4HCRKN53K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RNVLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RNVLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.RNV-Transport-App.RNVLiveActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		395F20BE2F128DB700BC7030 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 39111FA12F1C7046002FB482 /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = RNVLiveActivityExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A4HCRKN53K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RNVLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RNVLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.RNV-Transport-App.RNVLiveActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		395F1FD02F11B2B000BC7030 /* Build configuration list for PBXProject "RNV-Transport-App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				395F1FE32F11B2B200BC7030 /* Debug */,
+				395F1FE42F11B2B200BC7030 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		395F1FE52F11B2B200BC7030 /* Build configuration list for PBXNativeTarget "RNV-Transport-App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				395F1FE62F11B2B200BC7030 /* Debug */,
+				395F1FE72F11B2B200BC7030 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		395F20C02F128DB700BC7030 /* Build configuration list for PBXNativeTarget "RNVLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				395F20BD2F128DB700BC7030 /* Debug */,
+				395F20BE2F128DB700BC7030 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		395F1FE82F11B3F700BC7030 /* XCRemoteSwiftPackageReference "apollo-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apollographql/apollo-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		395F1FE92F11B3F700BC7030 /* Apollo */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 395F1FE82F11B3F700BC7030 /* XCRemoteSwiftPackageReference "apollo-ios" */;
+			productName = Apollo;
+		};
+		395F1FEB2F11B3F700BC7030 /* ApolloAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 395F1FE82F11B3F700BC7030 /* XCRemoteSwiftPackageReference "apollo-ios" */;
+			productName = ApolloAPI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 395F1FCD2F11B2B000BC7030 /* Project object */;
+}

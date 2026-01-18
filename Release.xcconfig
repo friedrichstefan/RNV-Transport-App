@@ -1,0 +1,12 @@
+// Release.xcconfig
+#include "Secrets.xcconfig"
+
+// Release-spezifische Build Settings
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ENABLE_BITCODE = YES
+SWIFT_OPTIMIZATION_LEVEL = -O
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = RELEASE
+ENABLE_TESTABILITY = NO
+
+// RNV Specific
+PRODUCT_BUNDLE_IDENTIFIER = com.stefanfriedrich.rnvapp

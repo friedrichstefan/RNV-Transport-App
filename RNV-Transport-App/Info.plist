@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <!-- RNV API Konfiguration -->
+        <key>RNV_CLIENT_ID</key>
+        <string>$(RNV_CLIENT_ID)</string>
+        
+        <key>RNV_CLIENT_SECRET</key>
+        <string>$(RNV_CLIENT_SECRET)</string>
+        
+        <key>RNV_TENANT_ID</key>
+        <string>$(RNV_TENANT_ID)</string>
+        
+        <key>RNV_RESOURCE</key>
+        <string>$(RNV_RESOURCE)</string>
+        
+        <!-- ✅ WICHTIG: Vollständige URL ohne Variablen -->
+        <key>RNV_GRAPHQL_URL</key>
+        <string>$(RNV_GRAPHQL_URL)</string>
+        
+        <key>RNV_APP_GROUP_ID</key>
+        <string>$(RNV_APP_GROUP_ID)</string>
+
+        <!-- App Transport Security -->
+        <key>NSAppTransportSecurity</key>
+        <dict>
+            <key>NSAllowsArbitraryLoads</key>
+            <false/>
+            <key>NSExceptionDomains</key>
+            <dict>
+                <key>graphql-sandbox-dds.rnv-online.de</key>
+                <dict>
+                    <key>NSExceptionMinimumTLSVersion</key>
+                    <string>TLSv1.2</string>
+                </dict>
+                <key>login.microsoftonline.com</key>
+                <dict>
+                    <key>NSExceptionMinimumTLSVersion</key>
+                    <string>TLSv1.2</string>
+                </dict>
+            </dict>
+        </dict>
+        
+        <!-- Background Modes -->
+        <key>UIBackgroundModes</key>
+        <array>
+            <string>location</string>
+            <string>fetch</string>
+        </array>
+
+        <!-- Standard iOS App Keys -->
+        <key>CFBundleDevelopmentRegion</key>
+        <string>$(DEVELOPMENT_LANGUAGE)</string>
+        
+        <key>CFBundleExecutable</key>
+        <string>$(EXECUTABLE_NAME)</string>
+        
+        <key>CFBundleIdentifier</key>
+        <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+        
+        <key>CFBundleInfoDictionaryVersion</key>
+        <string>6.0</string>
+        
+        <key>CFBundleName</key>
+        <string>$(PRODUCT_NAME)</string>
+        
+        <key>CFBundlePackageType</key>
+        <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+        
+        <key>CFBundleShortVersionString</key>
+        <string>$(MARKETING_VERSION)</string>
+        
+        <key>CFBundleVersion</key>
+        <string>$(CURRENT_PROJECT_VERSION)</string>
+        
+        <key>LSRequiresIPhoneOS</key>
+        <true/>
+        
+        <key>UILaunchScreen</key>
+        <dict/>
+        
+        <key>UIRequiredDeviceCapabilities</key>
+        <array>
+            <string>armv7</string>
+        </array>
+        
+        <key>UISupportedInterfaceOrientations</key>
+        <array>
+            <string>UIInterfaceOrientationPortrait</string>
+            <string>UIInterfaceOrientationLandscapeLeft</string>
+            <string>UIInterfaceOrientationLandscapeRight</string>
+        </array>
+        
+        <key>UISupportedInterfaceOrientations~ipad</key>
+        <array>
+            <string>UIInterfaceOrientationPortrait</string>
+            <string>UIInterfaceOrientationPortraitUpsideDown</string>
+            <string>UIInterfaceOrientationLandscapeLeft</string>
+            <string>UIInterfaceOrientationLandscapeRight</string>
+        </array>
+    </dict>
+    </plist>
