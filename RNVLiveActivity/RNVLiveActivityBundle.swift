@@ -12,5 +12,8 @@ import SwiftUI
 struct RNVLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         RNVLiveActivityLiveActivity()
+        NextDepartureWidget()
+        ActiveTripsWidget()
+        QuickSearchWidget()
     }
 }

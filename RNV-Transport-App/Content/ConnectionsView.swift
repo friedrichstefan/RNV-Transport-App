@@ -45,7 +45,7 @@ struct ConnectionsView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    RNVScrollableHeaderView(scrollOffset: scrollOffset)
+                    AppScrollableHeaderView(scrollOffset: scrollOffset)
                         .zIndex(1)
 
                     GeometryReader { geometry in
@@ -70,8 +70,6 @@ struct ConnectionsView: View {
                                     Color.clear
                                         .onChange(of: scrollGeometry.frame(in: .global).minY) { newValue in
                                             let newOffset = max(0, -newValue)
-                                            // Throttle: nur updaten wenn Änderung > 1pt – verhindert
-                                            // "action tried to update multiple times per frame" Warnung
                                             guard abs(newOffset - scrollOffset) > 1.0 else { return }
                                             scrollOffset = newOffset
                                         }
@@ -103,7 +101,6 @@ struct ConnectionsView: View {
     private var filteredTrips: [DetailedTrip] {
         var trips = graphQLService.detailedTrips
 
-        // Nur Trips mit Verspätung anzeigen
         if showDelaysOnly {
             trips = trips.filter { trip in
                 trip.legs.contains { leg in
@@ -115,7 +112,6 @@ struct ConnectionsView: View {
             }
         }
 
-        // Verkehrsmittelfilter
         if !enableTram || !enableBus || !enableSBahn {
             trips = trips.filter { trip in
                 trip.legs.filter { $0.isTimedLeg }.allSatisfy { leg in
@@ -132,7 +128,6 @@ struct ConnectionsView: View {
             }
         }
 
-        // Max. Anzahl Verbindungen begrenzen
         return Array(trips.prefix(maxConnections))
     }
 
@@ -148,10 +143,10 @@ struct ConnectionsView: View {
     private var loadingView: some View {
         VStack(spacing: 20) {
             ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.primaryColor))
                 .scaleEffect(1.5)
 
-            Text("Anmeldung läuft...")
+            Text("Verbindung wird hergestellt...")
                 .font(.headline)
                 .foregroundColor(.secondary)
         }
@@ -161,11 +156,11 @@ struct ConnectionsView: View {
 
     private var manualLoginView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "key.fill")
+            Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundStyle(AppTheme.accentGradient)
 
-            Text("Anmeldung fehlgeschlagen")
+            Text("Verbindung fehlgeschlagen")
                 .font(.title2)
                 .fontWeight(.bold)
 
@@ -180,7 +175,7 @@ struct ConnectionsView: View {
             }) {
                 HStack {
                     Image(systemName: "arrow.clockwise")
-                    Text("Erneut anmelden")
+                    Text("Erneut verbinden")
                 }
                 .font(.headline)
                 .foregroundColor(.white)
@@ -188,7 +183,7 @@ struct ConnectionsView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.blue)
+                        .fill(AppTheme.accentGradient)
                 )
             }
             .padding(.horizontal, 40)
@@ -207,7 +202,7 @@ struct ConnectionsView: View {
 
             if graphQLService.isLoading {
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                    .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.primaryColor))
                     .scaleEffect(1.5)
                     .padding()
             }
@@ -288,6 +283,7 @@ struct ConnectionsView: View {
                     Toggle("Geplante Abfahrt", isOn: $useCustomTime)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .tint(AppTheme.primaryColor)
 
                     Spacer()
                 }
@@ -295,7 +291,7 @@ struct ConnectionsView: View {
                 if useCustomTime {
                     HStack(spacing: 12) {
                         Image(systemName: "calendar.clock")
-                            .foregroundColor(.blue)
+                            .foregroundStyle(AppTheme.primaryColor)
                             .font(.system(size: 20))
 
                         DatePicker(
@@ -311,7 +307,7 @@ struct ConnectionsView: View {
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.blue.opacity(0.1))
+                            .fill(AppTheme.primaryColor.opacity(0.1))
                     )
                 }
             }
@@ -332,13 +328,7 @@ struct ConnectionsView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.blue.opacity(0.8)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(AppTheme.accentGradient)
                     )
                 }
                 .padding(.top, 8)
@@ -399,9 +389,9 @@ struct ConnectionsView: View {
     }
 }
 
-// MARK: - Header View
+// MARK: - Header View (Redesigned)
 
-struct RNVScrollableHeaderView: View {
+struct AppScrollableHeaderView: View {
     let scrollOffset: CGFloat
     @Environment(\.colorScheme) private var colorScheme
 
@@ -412,13 +402,13 @@ struct RNVScrollableHeaderView: View {
     var body: some View {
         let progress = min(max(scrollOffset / scrollThreshold, 0), 1)
         let currentHeight = maxHeaderHeight - (progress * (maxHeaderHeight - minHeaderHeight))
-        let logoSize = 50 - (progress * 20)
+        let iconSize = 28 - (progress * 10)
         let fontSize = 14 - (progress * 3)
 
         VStack(spacing: 0) {
             ZStack {
                 Rectangle()
-                    .fill(Color(red: 0/255, green: 43/255, blue: 78/255))
+                    .fill(AppTheme.headerBackground)
                     .ignoresSafeArea(.all, edges: .all)
                     .frame(height: currentHeight)
 
@@ -428,22 +418,29 @@ struct RNVScrollableHeaderView: View {
 
                     HStack(alignment: .center, spacing: max(6, 12 - (progress * 6))) {
                         HStack(spacing: max(4, 8 - (progress * 4))) {
-                            Image("rnv-logo")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: logoSize, height: logoSize)
-                                .animation(.easeInOut(duration: 0.3), value: logoSize)
+                            // App Icon statt RNV Logo
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(.white.opacity(0.15))
+                                    .frame(width: iconSize + 12, height: iconSize + 12)
+
+                                Image(systemName: "tram.circle.fill")
+                                    .font(.system(size: iconSize))
+                                    .foregroundStyle(.white)
+                                    .symbolRenderingMode(.hierarchical)
+                            }
+                            .animation(.easeInOut(duration: 0.3), value: iconSize)
 
                             if progress < 0.7 {
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text("Rhein-Neckar-Verkehr")
+                                    Text("Mannheim & Umgebung")
                                         .font(.system(size: fontSize, weight: .semibold))
                                         .foregroundColor(.white)
                                         .opacity(1 - progress)
 
-                                    Text("Ihre ÖPNV-App")
+                                    Text("ÖPNV · Live-Abfahrten")
                                         .font(.system(size: max(6, fontSize - 3), weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.white.opacity(0.7))
                                         .opacity(1 - progress)
                                 }
                                 .animation(.easeInOut(duration: 0.3), value: progress)
@@ -486,7 +483,7 @@ struct RNVScrollableHeaderView: View {
             }
 
             LinearGradient(
-                colors: [Color.black.opacity(0.1), Color.clear],
+                colors: [Color.black.opacity(0.08), Color.clear],
                 startPoint: .top,
                 endPoint: .bottom
             )

@@ -59,7 +59,7 @@ struct PlannedTripCard: View {
                         Text(isExpanded ? "Weniger" : "Details")
                             .font(.subheadline)
                     }
-                    .foregroundColor(.blue)
+                    .foregroundStyle(AppTheme.primaryColor)
                 }
 
                 Spacer()
@@ -220,7 +220,6 @@ struct PlannedTripCard: View {
                 endTime: savedTrip.endTime,
                 interchanges: savedTrip.interchanges,
                 legs: savedTrip.legs.map { legData in
-                    // LegType aus gespeichertem Rohwert wiederherstellen
                     let legType = legData.legType.flatMap { LegType(rawValue: $0) } ?? .timedLeg
                     return TripLeg(
                         type: legType,

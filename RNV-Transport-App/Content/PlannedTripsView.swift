@@ -32,7 +32,7 @@ struct PlannedTripsView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: refreshActiveTrips) {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.blue)
+                            .foregroundStyle(AppTheme.primaryColor)
                     }
                 }
 
@@ -62,16 +62,22 @@ struct PlannedTripsView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "bell.slash")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
+            ZStack {
+                Circle()
+                    .fill(AppTheme.primaryColor.opacity(0.1))
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "bell.slash")
+                    .font(.system(size: 50))
+                    .foregroundStyle(AppTheme.primaryColor.opacity(0.5))
+            }
 
             Text("Keine aktiven Fahrten")
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
 
-            Text("Live Activities werden hier angezeigt, sobald du eine Verbindung verfolgst")
+            Text("Live Activities werden hier angezeigt,\nsobald du eine Verbindung verfolgst")
                 .font(.subheadline)
                 .foregroundColor(.secondary.opacity(0.8))
                 .multilineTextAlignment(.center)

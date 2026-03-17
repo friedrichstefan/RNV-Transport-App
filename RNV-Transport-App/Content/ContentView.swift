@@ -41,17 +41,23 @@ struct ContentView: View {
                     Label("Einstellungen", systemImage: "gearshape.fill")
                 }
         }
+        .tint(AppTheme.primaryColor)
         .onAppear {
             #if DEBUG
             print("🔍 [xcconfig] CLIENT_ID: \(Bundle.main.object(forInfoDictionaryKey: "RNV_CLIENT_ID") ?? "❌ NIL")")
             print("🔍 [xcconfig] GRAPHQL_URL: \(Bundle.main.object(forInfoDictionaryKey: "RNV_GRAPHQL_URL") ?? "❌ NIL")")
             #endif
 
-            // Certificate Pinning muss auch im Release-Build eingerichtet werden
             graphQLService.setupCertificatePinning()
 
             startPeriodicRefresh()
             startDailyCleanup()
+
+            // Tab Bar Appearance
+            let tabBarAppearance = UITabBarAppearance()
+            tabBarAppearance.configureWithDefaultBackground()
+            UITabBar.appearance().standardAppearance = tabBarAppearance
+            UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
         }
         .onDisappear {
             refreshTask?.cancel()
@@ -78,7 +84,6 @@ struct ContentView: View {
     private func startDailyCleanup() {
         cleanupTask?.cancel()
         cleanupTask = Task {
-            // Sofort beim App-Start abgelaufene Trips entfernen
             TripDataManager.shared.removeExpiredTrips()
             print("✅ [CLEANUP] Initiales Cleanup beim App-Start abgeschlossen")
 
@@ -90,6 +95,28 @@ struct ContentView: View {
             }
         }
     }
+}
+
+// MARK: - App Theme
+
+struct AppTheme {
+    static let primaryColor = Color(red: 0.0, green: 0.55, blue: 0.65) // Teal
+    static let secondaryColor = Color(red: 0.30, green: 0.25, blue: 0.65) // Indigo
+    static let accentGradient = LinearGradient(
+        colors: [primaryColor, secondaryColor],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    static let headerBackground = LinearGradient(
+        colors: [
+            Color(red: 0.08, green: 0.12, blue: 0.22),
+            Color(red: 0.0, green: 0.30, blue: 0.40)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    static let cardBackground = Color(.systemBackground)
+    static let subtleBackground = Color(.secondarySystemGroupedBackground)
 }
 
 #Preview {

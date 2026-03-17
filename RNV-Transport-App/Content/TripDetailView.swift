@@ -55,7 +55,7 @@ struct TripDetailView: View {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(action: toggleLiveActivity) {
                             Image(systemName: isLiveActivityActive ? "bell.badge.fill" : "bell")
-                                .foregroundColor(isLiveActivityActive ? .green : .blue)
+                                .foregroundColor(isLiveActivityActive ? .green : AppTheme.primaryColor)
                                 .font(.title3)
                         }
                     }
@@ -164,7 +164,7 @@ struct TripDetailView: View {
 
                     HStack(spacing: 8) {
                         Image(systemName: "info.circle")
-                            .foregroundColor(.blue)
+                            .foregroundStyle(AppTheme.primaryColor)
                             .font(.system(size: 14))
 
                         Text("Echtzeit-Updates werden auf dem Sperrbildschirm und in der Dynamic Island angezeigt")
@@ -247,7 +247,7 @@ struct TripDetailView: View {
                 estimatedDepartureTime: "2026-01-18T14:33:00.000Z",
                 estimatedArrivalTime: "2026-01-18T14:48:00.000Z",
                 serviceType: "STRASSENBAHN",
-                serviceName: "RNV 5",
+                serviceName: "Linie 5",
                 serviceDescription: nil,
                 destinationLabel: "Heidelberg Hauptbahnhof"
             ),
@@ -275,7 +275,7 @@ struct TripDetailView: View {
                 estimatedDepartureTime: nil,
                 estimatedArrivalTime: nil,
                 serviceType: "BUS",
-                serviceName: "RNV 33",
+                serviceName: "Linie 33",
                 serviceDescription: nil,
                 destinationLabel: "Rohrbach"
             )

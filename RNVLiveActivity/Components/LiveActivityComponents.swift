@@ -10,142 +10,354 @@ import ActivityKit
 import WidgetKit
 import AppIntents
 
-// MARK: - Journey Progress View
+// MARK: - Local Phase Calculator
 
-struct JourneyProgressView: View {
+/// Berechnet die Phase lokal basierend auf der aktuellen Zeit,
+/// damit der Übergang sofort sichtbar ist (ohne auf Server-Update zu warten).
+struct LocalPhaseCalculator {
+    /// Dauer in Sekunden, in der nach Abfahrt "Abgefahren!" angezeigt wird
+    static let departureMomentDuration: TimeInterval = 10
+
+    enum LocalPhase {
+        case beforeDeparture
+        case departureMoment   // Kurzer Übergang: "Abgefahren!"
+        case duringJourney
+        case arrived
+    }
+
+    static func calculate(
+        departureTimeISO: String,
+        arrivalTimeISO: String,
+        delay: Int?,
+        currentTime: Date
+    ) -> LocalPhase {
+        guard let departureDate = DateCalculationHelper.parseDate(departureTimeISO),
+              let arrivalDate = DateCalculationHelper.parseDate(arrivalTimeISO) else {
+            return .duringJourney
+        }
+
+        let effectiveDeparture: Date
+        let effectiveArrival: Date
+
+        if let d = delay, d > 0 {
+            effectiveDeparture = departureDate.addingTimeInterval(TimeInterval(d * 60))
+            effectiveArrival = arrivalDate.addingTimeInterval(TimeInterval(d * 60))
+        } else {
+            effectiveDeparture = departureDate
+            effectiveArrival = arrivalDate
+        }
+
+        if currentTime < effectiveDeparture {
+            return .beforeDeparture
+        }
+
+        if currentTime >= effectiveArrival {
+            return .arrived
+        }
+
+        // Innerhalb der ersten Sekunden nach Abfahrt: Übergangsmoment
+        let timeSinceDeparture = currentTime.timeIntervalSince(effectiveDeparture)
+        if timeSinceDeparture <= departureMomentDuration {
+            return .departureMoment
+        }
+
+        return .duringJourney
+    }
+}
+
+// MARK: - Journey Progress Bar
+
+struct JourneyProgressBar: View {
     let departureDate: Date
     let arrivalDate: Date
     let serviceType: String
     let delay: Int?
-    
+    let currentTime: Date
+
     private var effectiveDepartureDate: Date {
         if let delay = delay, delay > 0 {
             return departureDate.addingTimeInterval(TimeInterval(delay * 60))
         }
         return departureDate
     }
-    
-    var body: some View {
-        TimelineView(.periodic(from: Date(), by: 1.0)) { context in
-            journeyContent(currentTime: context.date)
-        }
-    }
-    
-    @ViewBuilder
-    private func journeyContent(currentTime: Date) -> some View {
+
+    private var progress: CGFloat {
         if currentTime < effectiveDepartureDate {
-            beforeDepartureView(currentTime: currentTime)
-        } else {
-            duringJourneyView(currentTime: currentTime)
+            return 0
         }
+        let total = arrivalDate.timeIntervalSince(effectiveDepartureDate)
+        guard total > 0 else { return 1 }
+        let elapsed = currentTime.timeIntervalSince(effectiveDepartureDate)
+        return CGFloat(min(1.0, max(0.0, elapsed / total)))
     }
-    
-    @ViewBuilder
-    private func beforeDepartureView(currentTime: Date) -> some View {
-        let actualDepartureDate = effectiveDepartureDate
-        
-        let totalTimeRemaining = max(0, actualDepartureDate.timeIntervalSince(currentTime))
-        let initialTotalTime = actualDepartureDate.timeIntervalSince(Date())
-        let progress: CGFloat = initialTotalTime > 0 ?
-            min(1.0, max(0.0, 1.0 - (totalTimeRemaining / initialTotalTime))) : 1.0
-        
-        HStack(spacing: 6) {
-            VStack(spacing: 3) {
-                HStack(spacing: 6) {
-                    Circle().fill(progress >= 0.2 ? Color.blue : Color.gray.opacity(0.3))
-                        .frame(width: 5, height: 5).animation(.easeInOut, value: progress)
-                    Circle().fill(progress >= 0.4 ? Color.blue : Color.gray.opacity(0.5))
-                        .frame(width: 5, height: 5).animation(.easeInOut, value: progress)
-                    Image(systemName: "figure.run").font(.system(size: 12))
-                        .foregroundColor(progress >= 0.6 ? .blue : .gray).animation(.easeInOut, value: progress)
-                    Circle().fill(progress >= 0.8 ? Color.blue : Color.gray.opacity(0.5))
-                        .frame(width: 5, height: 5).animation(.easeInOut, value: progress)
-                    Circle().fill(progress >= 1.0 ? Color.blue : Color.gray.opacity(0.3))
-                        .frame(width: 5, height: 5).animation(.easeInOut, value: progress)
-                }
-                
-                Text(formatTimeRemaining(totalTimeRemaining))
-                    .font(.system(size: 12)).fontWeight(.semibold)
-                    .foregroundColor(delay != nil && delay! > 0 ? .red : .blue)
-                    .monospacedDigit()
-            }
-            .frame(width: 80).padding(.top, 10)
-            
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.gray.opacity(0.3)).frame(height: 15)
-                    Capsule().fill(delay != nil && delay! > 0 ? Color.red : Color.blue)
-                        .frame(width: geometry.size.width * progress, height: 15)
-                        .animation(.linear(duration: 1.0), value: progress)
-                }
-            }
-            .frame(height: 15).clipShape(Capsule())
-        }
-    }
-    
-    @ViewBuilder
-    private func duringJourneyView(currentTime: Date) -> some View {
-        let progress = calculateJourneyProgress(currentTime: currentTime)
-        
-        GeometryReader { geometry in
+
+    var body: some View {
+        GeometryReader { geo in
+            let barWidth = geo.size.width
+            let indicatorX = barWidth * progress
+
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.gray.opacity(0.3))
-                    .frame(height: 15)
-                
-                Capsule().fill(Color.blue)
-                    .frame(width: geometry.size.width * progress, height: 15)
-                    .animation(.linear(duration: 1.0), value: progress)
-                
-                HStack {
-                    Spacer().frame(width: max(0, geometry.size.width * progress - 12))
-                    Image(systemName: StyleHelper.getIcon(for: serviceType))
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(Color.blue)
-                                .shadow(color: .black.opacity(0.4), radius: 5, x: 0, y: 2)
+                // Track
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(height: 6)
+
+                // Filled
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [accentColor.opacity(0.6), accentColor],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
-                    Spacer()
+                    )
+                    .frame(width: max(6, barWidth * progress), height: 6)
+
+                // Vehicle indicator
+                if progress > 0 && progress < 1 {
+                    ZStack {
+                        Circle()
+                            .fill(accentColor)
+                            .frame(width: 22, height: 22)
+                            .shadow(color: accentColor.opacity(0.5), radius: 4, x: 0, y: 2)
+
+                        Image(systemName: StyleHelper.getIcon(for: serviceType))
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .offset(x: max(0, min(indicatorX - 11, barWidth - 22)))
                 }
             }
         }
-        .frame(height: 30)
+        .frame(height: 22)
     }
-    
-    private func calculateJourneyProgress(currentTime: Date) -> CGFloat {
-        let actualDepartureDate = effectiveDepartureDate
-        
-        let journeyDuration = arrivalDate.timeIntervalSince(actualDepartureDate)
-        let elapsedTime = currentTime.timeIntervalSince(actualDepartureDate)
-        
-        let progress = min(1.0, max(0.0, elapsedTime / journeyDuration))
-        return CGFloat(progress)
-    }
-    
-    private func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {
-        let minutes = Int(timeInterval) / 60
-        let seconds = Int(timeInterval) % 60
-        return minutes > 0 ? String(format: "%d:%02d", minutes, seconds) : String(format: "0:%02d", seconds)
+
+    private var accentColor: Color {
+        if let d = delay, d > 0 { return .orange }
+        return StyleHelper.getColor(for: serviceType)
     }
 }
 
-// MARK: - Status Badge View
+// MARK: - Countdown Badge
 
-struct StatusBadgeView: View {
-    let icon: String
-    let text: String
+struct CountdownBadge: View {
+    let timeRange: ClosedRange<Date>?
+    let label: String
     let color: Color
-    
+
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: 9, weight: .semibold))
-            Text(text).font(.system(size: 10, weight: .bold))
+        VStack(spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundColor(color.opacity(0.7))
+
+            if let range = timeRange {
+                Text(timerInterval: range, countsDown: true)
+                    .font(.system(size: 22, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(color)
+                    .contentTransition(.numericText(countsDown: true))
+            } else {
+                Text("--:--")
+                    .font(.system(size: 22, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(color.opacity(0.4))
+            }
+        }
+    }
+}
+
+// MARK: - Line Badge
+
+struct LineBadge: View {
+    let serviceType: String
+    let lineName: String
+    let size: LineBadgeSize
+
+    enum LineBadgeSize {
+        case small, medium, large
+    }
+
+    var body: some View {
+        HStack(spacing: iconSpacing) {
+            Image(systemName: StyleHelper.getIcon(for: serviceType))
+                .font(.system(size: iconSize, weight: .bold))
+            Text(StyleHelper.getShortName(from: lineName))
+                .font(.system(size: textSize, weight: .heavy, design: .rounded))
         }
         .foregroundColor(.white)
-        .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 9).fill(color))
+        .padding(.horizontal, hPadding)
+        .padding(.vertical, vPadding)
+        .background(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(StyleHelper.getColor(for: serviceType))
+        )
+    }
+
+    private var iconSize: CGFloat {
+        switch size {
+        case .small: return 9
+        case .medium: return 12
+        case .large: return 14
+        }
+    }
+
+    private var textSize: CGFloat {
+        switch size {
+        case .small: return 10
+        case .medium: return 13
+        case .large: return 15
+        }
+    }
+
+    private var iconSpacing: CGFloat {
+        switch size {
+        case .small: return 3
+        case .medium: return 4
+        case .large: return 5
+        }
+    }
+
+    private var hPadding: CGFloat {
+        switch size {
+        case .small: return 6
+        case .medium: return 9
+        case .large: return 11
+        }
+    }
+
+    private var vPadding: CGFloat {
+        switch size {
+        case .small: return 3
+        case .medium: return 5
+        case .large: return 6
+        }
+    }
+
+    private var cornerRadius: CGFloat {
+        switch size {
+        case .small: return 6
+        case .medium: return 8
+        case .large: return 10
+        }
+    }
+}
+
+// MARK: - Delay Chip
+
+struct DelayChip: View {
+    let delay: Int?
+
+    var body: some View {
+        if let d = delay, d > 0 {
+            Text("+\(d)'")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule().fill(Color.orange)
+                )
+        }
+    }
+}
+
+// MARK: - Station Timeline Row
+
+struct StationTimelineRow: View {
+    let fromStation: String
+    let toStation: String
+    let departureTimeISO: String
+    let arrivalTimeISO: String
+    let serviceType: String
+    let delay: Int?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Timeline dots + line
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(StyleHelper.getColor(for: serviceType))
+                    .frame(width: 8, height: 8)
+
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                StyleHelper.getColor(for: serviceType),
+                                StyleHelper.getColor(for: serviceType).opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 2)
+                    .frame(maxHeight: .infinity)
+
+                Circle()
+                    .strokeBorder(StyleHelper.getColor(for: serviceType).opacity(0.5), lineWidth: 2)
+                    .frame(width: 8, height: 8)
+            }
+            .frame(width: 12)
+            .padding(.vertical, 2)
+
+            // Station info
+            VStack(alignment: .leading, spacing: 8) {
+                // Departure
+                HStack(alignment: .center, spacing: 6) {
+                    Text(formattedTime(from: departureTimeISO))
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(.primary)
+                    DelayChip(delay: delay)
+                    Text(fromStation)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+
+                // Arrival
+                HStack(alignment: .center, spacing: 6) {
+                    Text(formattedTime(from: arrivalTimeISO))
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    if let d = delay, d > 0 {
+                        DelayChip(delay: d)
+                    }
+                    Text(toStation)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+        }
+    }
+
+    private func formattedTime(from isoString: String) -> String {
+        guard let date = DateCalculationHelper.parseDate(isoString) else { return "--:--" }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        return fmt.string(from: date)
+    }
+}
+
+// MARK: - Departure Moment Badge (Übergangsanzeige)
+
+struct DepartureMomentBadge: View {
+    let serviceType: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Image(systemName: StyleHelper.getIcon(for: serviceType))
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(StyleHelper.getColor(for: serviceType))
+
+            Text("Abgefahren!")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .foregroundColor(StyleHelper.getColor(for: serviceType))
+        }
+        .transition(.opacity.combined(with: .scale))
     }
 }
 
@@ -153,69 +365,71 @@ struct StatusBadgeView: View {
 
 struct ArrivedView: View {
     let context: ActivityViewContext<TripLiveActivityAttributes>
-    
+
     var body: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundColor(.green)
-                
-                Text("Angekommen!")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-            }
-            
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("VON")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text(context.attributes.startStation)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    Image(systemName: "arrow.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("NACH")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text(context.attributes.endStation)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.green)
                 }
-                
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.2))
-                    .frame(height: 0.5)
-                
-                Text("Schließt automatisch in 1 Minute")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Angekommen!")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    Text(context.attributes.endStation)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
             }
-            .padding(16)
+
+            // Route summary
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("VON")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.secondary)
+                    Text(context.attributes.startStation)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.secondary)
+
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("NACH")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.secondary)
+                    Text(context.attributes.endStation)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(10)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color(.secondarySystemGroupedBackground))
             )
+
+            Text("Schließt automatisch")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(16)
         .background(Color(.systemBackground))
     }
 }
@@ -226,209 +440,213 @@ struct ContentMediumView: View {
     let context: ActivityViewContext<TripLiveActivityAttributes>
     let isBeforeDeparture: Bool
     let currentTime: Date
-    
-    var body: some View {
+
+    private var accentColor: Color {
+        StyleHelper.getColor(for: context.state.serviceType)
+    }
+
+    private var hasDelay: Bool {
+        (context.state.delay ?? 0) > 0
+    }
+
+    /// Lokal berechnete Phase für sofortigen Übergang
+    private var localPhase: LocalPhaseCalculator.LocalPhase {
         if context.state.phase == .arrived {
+            return .arrived
+        }
+        return LocalPhaseCalculator.calculate(
+            departureTimeISO: context.attributes.departureTimeISO,
+            arrivalTimeISO: context.attributes.arrivalTimeISO,
+            delay: context.state.delay,
+            currentTime: currentTime
+        )
+    }
+
+    var body: some View {
+        if localPhase == .arrived {
             ArrivedView(context: context)
         } else {
-            regularView
+            mainView
         }
     }
-    
-    private var regularView: some View {
+
+    private var mainView: some View {
         VStack(spacing: 0) {
-            headerSection
-            progressSection
-        }
-        .frame(
-            minHeight: isBeforeDeparture ? 140 : 120,
-            maxHeight: isBeforeDeparture ? 180 : 160
-        )
-        .background(Color(.systemBackground))
-        .activityBackgroundTint(Color(.systemBackground))
-        .activitySystemActionForegroundColor(Color.primary)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isBeforeDeparture)
-    }
-    
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
-                lineInfoBadge
-                Spacer()
-                statusBadge
-            }
-            stationInfoRow
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, isBeforeDeparture ? 16 : 24)
-        .padding(.bottom, isBeforeDeparture ? 14 : 10)
-    }
-    
-    private var lineInfoBadge: some View {
-        HStack(spacing: 4) {
-            Image(systemName: StyleHelper.getIcon(for: context.state.serviceType))
-                .font(.system(size: 13, weight: .semibold))
-            Text(StyleHelper.getShortName(from: context.state.lineName))
-                .font(.system(size: 14, weight: .bold))
-        }
-        .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 10).fill(StyleHelper.getColor(for: context.state.serviceType)))
-    }
-    
-    private var statusBadge: some View {
-        Group {
-            if isBeforeDeparture {
-                if let delay = context.state.delay, delay > 0 {
-                    StatusBadgeView(icon: "clock.badge.exclamationmark", text: "+\(delay)'", color: .red)
-                } else {
-                    StatusBadgeView(icon: "checkmark.circle.fill", text: "Pünktlich", color: .green)
-                }
-            } else {
-                if let delay = context.state.delay, delay > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "clock.badge.exclamationmark").font(.system(size: 10))
-                        Text("+\(delay) min").font(.system(size: 13, weight: .bold)).lineLimit(1)
-                    }
-                    .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Capsule().fill(Color.red))
-                    .frame(width: 110, alignment: .trailing)
-                } else {
-                    StatusBadgeView(icon: "arrow.right.circle.fill", text: "Unterwegs", color: .blue)
-                }
-            }
-        }
-    }
-    
-    private var stationInfoRow: some View {
-        HStack(alignment: .top, spacing: 10) {
-            startStationView
-            connectionIndicator
-            endStationView
-        }
-    }
-    
-    private var startStationView: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("VON").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
-            
-            Text(context.attributes.startStation).font(.system(size: 14, weight: .bold))
-                .foregroundColor(.primary).lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
-    private var connectionIndicator: some View {
-        VStack(spacing: 3) {
-            Circle().fill(StyleHelper.getColor(for: context.state.serviceType)).frame(width: 5, height: 5)
-            Rectangle().fill(Color.secondary.opacity(0.3)).frame(width: 1.5).frame(minHeight: 20)
-            Circle().fill(Color.secondary.opacity(0.4)).frame(width: 5, height: 5)
-        }
-        .frame(width: 30).padding(.top, 14)
-    }
-    
-    private var endStationView: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text("NACH").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
-            
-            Text(context.attributes.endStation).font(.system(size: 14, weight: .bold))
-                .foregroundColor(.primary).lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.trailing)
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-    
-    private var progressSection: some View {
-        VStack(spacing: 6) {
-            JourneyProgressView(
-                departureDate: DateCalculationHelper.parseDate(context.attributes.departureTimeISO) ?? Date(),
-                arrivalDate: DateCalculationHelper.parseDate(context.attributes.arrivalTimeISO) ?? Date().addingTimeInterval(20 * 60),
+            // Header bar
+            headerBar
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
+
+            // Station timeline
+            StationTimelineRow(
+                fromStation: context.attributes.startStation,
+                toStation: context.attributes.endStation,
+                departureTimeISO: context.attributes.departureTimeISO,
+                arrivalTimeISO: context.attributes.arrivalTimeISO,
                 serviceType: context.state.serviceType,
                 delay: context.state.delay
             )
-            .frame(height: 18)
-            
-            if !isBeforeDeparture {
-                footerRow
+            .frame(height: 52)
+            .padding(.horizontal, 16)
+
+            Spacer().frame(height: 8)
+
+            // Progress + Countdown
+            HStack(spacing: 12) {
+                // Progress bar
+                JourneyProgressBar(
+                    departureDate: DateCalculationHelper.parseDate(context.attributes.departureTimeISO) ?? Date(),
+                    arrivalDate: DateCalculationHelper.parseDate(context.attributes.arrivalTimeISO) ?? Date().addingTimeInterval(1200),
+                    serviceType: context.state.serviceType,
+                    delay: context.state.delay,
+                    currentTime: currentTime
+                )
+
+                // Countdown mit Übergang
+                compactCountdown
+                    .frame(width: 70)
+                    .animation(.easeInOut(duration: 0.5), value: localPhase == .beforeDeparture)
+                    .animation(.easeInOut(duration: 0.5), value: localPhase == .departureMoment)
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 14)
         }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 20)
+        .background(Color(.systemBackground))
+        .activityBackgroundTint(Color(.systemBackground))
+        .activitySystemActionForegroundColor(.primary)
     }
-    
-    private var footerRow: some View {
-        HStack(spacing: 0) {
-            destinationInfo
-            Spacer()
-            timerDisplay
-        }
-    }
-    
-    private var destinationInfo: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                .font(.system(size: 10))
-                .foregroundColor(StyleHelper.getColor(for: context.state.serviceType))
-            
+
+    // MARK: - Header Bar
+
+    private var headerBar: some View {
+        HStack(spacing: 8) {
+            LineBadge(
+                serviceType: context.state.serviceType,
+                lineName: context.state.lineName,
+                size: .medium
+            )
+
+            Image(systemName: "arrow.right")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(.secondary)
+
             Text(context.state.destination)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary).lineLimit(1)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Status indicator
+            statusIndicator
         }
     }
-    
-    private var timerDisplay: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "timer")
-                .font(.system(size: 9)).foregroundColor(.secondary)
-            
-            duringJourneyTimer
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 7)
-                .fill(Color.secondary.opacity(0.1))
-        )
-    }
-    
+
     @ViewBuilder
-    private var duringJourneyTimer: some View {
-        if let delay = context.state.delay, delay > 0 {
-            let timeRange = DateCalculationHelper.safeCalculateDelayedArrivalDate(
-                from: context.attributes.arrivalTimeISO,
-                delayMinutes: delay,
-                currentTime: currentTime
-            )
-            
-            if let range = timeRange {
-                Text(timerInterval: range, countsDown: true)
-                    .font(.system(size: 12, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundColor(.blue)
-            } else {
-                Text("--:--")
-                    .font(.system(size: 12, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundColor(.blue)
+    private var statusIndicator: some View {
+        if localPhase == .departureMoment {
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 9, weight: .bold))
+                Text("Unterwegs")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
             }
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(accentColor))
+        } else if hasDelay {
+            HStack(spacing: 3) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 9, weight: .bold))
+                Text("+\(context.state.delay!)min")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.orange))
         } else {
-            let timeRange = DateCalculationHelper.safeCalculateRealArrivalDate(
-                from: context.attributes.arrivalTimeISO,
-                currentTime: currentTime
-            )
-            
-            if let range = timeRange {
-                Text(timerInterval: range, countsDown: true)
-                    .font(.system(size: 12, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundColor(.blue)
-            } else {
-                Text("--:--")
-                    .font(.system(size: 12, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundColor(.blue)
+            HStack(spacing: 3) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 6, height: 6)
+                Text("Pünktlich")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.green)
             }
         }
+    }
+
+    // MARK: - Compact Countdown
+
+    @ViewBuilder
+    private var compactCountdown: some View {
+        switch localPhase {
+        case .beforeDeparture:
+            let range = countdownRange(to: context.attributes.departureTimeISO)
+            VStack(spacing: 1) {
+                Text("ABF")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundColor(.secondary)
+                if let range = range {
+                    Text(timerInterval: range, countsDown: true)
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(hasDelay ? .orange : .green)
+                        .contentTransition(.numericText(countsDown: true))
+                } else {
+                    Text("Jetzt")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundColor(accentColor)
+                }
+            }
+
+        case .departureMoment:
+            DepartureMomentBadge(serviceType: context.state.serviceType)
+
+        case .duringJourney:
+            let range = countdownRange(to: context.attributes.arrivalTimeISO)
+            VStack(spacing: 1) {
+                Text("ANK")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundColor(.secondary)
+                if let range = range {
+                    Text(timerInterval: range, countsDown: true)
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(hasDelay ? .orange : .blue)
+                        .contentTransition(.numericText(countsDown: true))
+                } else {
+                    Text("--:--")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+        case .arrived:
+            VStack(spacing: 1) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.green)
+                Text("Da!")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundColor(.green)
+            }
+        }
+    }
+
+    private func countdownRange(to isoString: String) -> ClosedRange<Date>? {
+        if let d = context.state.delay, d > 0 {
+            guard let date = DateCalculationHelper.parseDate(isoString) else { return nil }
+            let delayed = date.addingTimeInterval(TimeInterval(d * 60))
+            guard delayed > currentTime else { return nil }
+            return currentTime...delayed
+        }
+        guard let date = DateCalculationHelper.parseDate(isoString),
+              date > currentTime else { return nil }
+        return currentTime...date
     }
 }
 
@@ -437,18 +655,14 @@ struct ContentMediumView: View {
 struct DynamicIslandExpandedLeading: View {
     let serviceType: String
     let lineName: String
-    
+
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: StyleHelper.getIcon(for: serviceType))
-                .font(.system(size: 12, weight: .medium))
-            Text(StyleHelper.getShortName(from: lineName))
-                .font(.system(size: 12, weight: .bold))
-                .lineLimit(1).minimumScaleFactor(0.8)
-        }
-        .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
-        .background(Capsule().fill(StyleHelper.getColor(for: serviceType)))
-        .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 8)
+        LineBadge(
+            serviceType: serviceType,
+            lineName: lineName,
+            size: .small
+        )
+        .padding(.leading, 4)
     }
 }
 
@@ -457,36 +671,32 @@ struct DynamicIslandExpandedLeading: View {
 struct DynamicIslandExpandedTrailing: View {
     let delay: Int?
     let phase: TripPhase
-    
+
     var body: some View {
         Group {
             if phase == .arrived {
-                HStack(spacing: 3) {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 10))
-                    Text("Angekommen").font(.system(size: 12, weight: .medium)).lineLimit(1)
-                }
-                .foregroundColor(.white).padding(.horizontal, 8).padding(.vertical, 5)
-                .background(Capsule().fill(Color.green))
-                .frame(width: 110, alignment: .trailing)
-            } else if let delay = delay, delay > 0 {
-                HStack(spacing: 3) {
-                    Image(systemName: "clock.badge.exclamationmark").font(.system(size: 10))
-                    Text("+\(delay) min").font(.system(size: 12, weight: .bold)).lineLimit(1)
-                }
-                .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Capsule().fill(Color.red))
-                .frame(width: 110, alignment: .trailing)
+                chipView(icon: "checkmark.circle.fill", text: "Da!", color: .green)
+            } else if let d = delay, d > 0 {
+                chipView(icon: "exclamationmark.triangle.fill", text: "+\(d)'", color: .orange)
             } else {
-                HStack(spacing: 3) {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 10))
-                    Text("Pünktlich").font(.system(size: 12, weight: .medium)).lineLimit(1)
-                }
-                .foregroundColor(.white).padding(.horizontal, 8).padding(.vertical, 5)
-                .background(Capsule().fill(Color.green))
-                .frame(width: 110, alignment: .trailing)
+                chipView(icon: "checkmark.circle.fill", text: "Pünktlich", color: .green)
             }
         }
-        .padding(.trailing, 8)
+        .padding(.trailing, 4)
+    }
+
+    private func chipView(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .bold))
+            Text(text)
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .lineLimit(1)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(color))
     }
 }
 
@@ -496,51 +706,50 @@ struct DynamicIslandArrivedBottom: View {
     let startStation: String
     let endStation: String
     let tripId: String
-    
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("VON").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
-                    Text(startStation).font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.green)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Angekommen")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    Text(endStation)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Image(systemName: "arrow.right").font(.system(size: 11))
-                    .foregroundColor(.secondary).padding(.top, 8)
-                
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("NACH").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
-                    Text(endStation).font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
+
+                Spacer()
             }
             .padding(.horizontal, 12)
-            
+
             if #available(iOS 16.2, *) {
                 Button(intent: EndAllActivitiesIntent()) {
                     HStack(spacing: 6) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                         Text("Beenden")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 10)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.red)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.red.opacity(0.8))
                     )
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 2)
             }
         }
-        .padding(.top, 0)
+        .padding(.top, 4)
     }
 }
 
@@ -555,9 +764,23 @@ struct DynamicIslandExpandedBottom: View {
     let delay: Int?
     let phase: TripPhase
     let tripId: String
-    
-    var body: some View {
+    let currentTime: Date
+
+    /// Lokal berechnete Phase für sofortigen Übergang
+    private var localPhase: LocalPhaseCalculator.LocalPhase {
         if phase == .arrived {
+            return .arrived
+        }
+        return LocalPhaseCalculator.calculate(
+            departureTimeISO: departureTimeISO,
+            arrivalTimeISO: arrivalTimeISO,
+            delay: delay,
+            currentTime: currentTime
+        )
+    }
+
+    var body: some View {
+        if localPhase == .arrived {
             DynamicIslandArrivedBottom(
                 startStation: startStation,
                 endStation: endStation,
@@ -567,47 +790,156 @@ struct DynamicIslandExpandedBottom: View {
             regularBottomView
         }
     }
-    
+
     private var regularBottomView: some View {
-        VStack(spacing: 10) {
-            stationRow
-            progressBar
-        }
-        .padding(.top, 0)
-    }
-    
-    private var stationRow: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("VON").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
-                Text(startStation).font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
+        VStack(spacing: 8) {
+            // Route with times
+            HStack(spacing: 0) {
+                // From
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 3) {
+                        Text(formattedTime(from: departureTimeISO))
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                        if let d = delay, d > 0 {
+                            Text("+\(d)'")
+                                .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    Text(startStation)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Center countdown
+                centerCountdown
+                    .frame(width: 64)
+
+                // To
+                VStack(alignment: .trailing, spacing: 1) {
+                    HStack(spacing: 3) {
+                        if let d = delay, d > 0 {
+                            Text("+\(d)'")
+                                .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                .foregroundColor(.orange)
+                        }
+                        Text(formattedTime(from: arrivalTimeISO))
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                    }
+                    Text(endStation)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Image(systemName: "arrow.right").font(.system(size: 11))
-                .foregroundColor(.secondary).padding(.top, 8)
-            
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("NACH").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
-                Text(endStation).font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, 12)
+
+            // Progress bar
+            JourneyProgressBar(
+                departureDate: DateCalculationHelper.parseDate(departureTimeISO) ?? Date(),
+                arrivalDate: DateCalculationHelper.parseDate(arrivalTimeISO) ?? Date().addingTimeInterval(1200),
+                serviceType: serviceType,
+                delay: delay,
+                currentTime: currentTime
+            )
+            .frame(height: 22)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 4)
         }
-        .padding(.horizontal, 12)
+        .padding(.top, 2)
     }
-    
-    private var progressBar: some View {
-        JourneyProgressView(
-            departureDate: DateCalculationHelper.parseDate(departureTimeISO) ?? Date(),
-            arrivalDate: DateCalculationHelper.parseDate(arrivalTimeISO) ?? Date().addingTimeInterval(20 * 60),
-            serviceType: serviceType,
-            delay: delay
-        )
-        .frame(height: 24)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 4)
+
+    @ViewBuilder
+    private var centerCountdown: some View {
+        let hasDelay = delay != nil && delay! > 0
+
+        switch localPhase {
+        case .beforeDeparture:
+            let range = departureRange()
+            VStack(spacing: 0) {
+                Text("in")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.secondary)
+                if let range = range {
+                    Text(timerInterval: range, countsDown: true)
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(hasDelay ? .orange : .green)
+                        .contentTransition(.numericText(countsDown: true))
+                } else {
+                    Text("Jetzt")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundColor(.green)
+                }
+            }
+
+        case .departureMoment:
+            VStack(spacing: 0) {
+                Image(systemName: StyleHelper.getIcon(for: serviceType))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(StyleHelper.getColor(for: serviceType))
+                Text("Los!")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundColor(StyleHelper.getColor(for: serviceType))
+            }
+
+        case .duringJourney:
+            let range = arrivalRange()
+            VStack(spacing: 0) {
+                Text("noch")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.secondary)
+                if let range = range {
+                    Text(timerInterval: range, countsDown: true)
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(hasDelay ? .orange : .blue)
+                        .contentTransition(.numericText(countsDown: true))
+                } else {
+                    Text("--:--")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+        case .arrived:
+            VStack(spacing: 0) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.green)
+                Text("Da!")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundColor(.green)
+            }
+        }
+    }
+
+    private func departureRange() -> ClosedRange<Date>? {
+        if let d = delay, d > 0 {
+            return DateCalculationHelper.safeCalculateEstimatedDepartureDate(
+                from: departureTimeISO, delayMinutes: d, currentTime: currentTime)
+        }
+        return DateCalculationHelper.safeCalculateDepartureDate(from: departureTimeISO, currentTime: currentTime)
+    }
+
+    private func arrivalRange() -> ClosedRange<Date>? {
+        if let d = delay, d > 0 {
+            return DateCalculationHelper.safeCalculateDelayedArrivalDate(
+                from: arrivalTimeISO, delayMinutes: d, currentTime: currentTime)
+        }
+        return DateCalculationHelper.safeCalculateRealArrivalDate(from: arrivalTimeISO, currentTime: currentTime)
+    }
+
+    private func formattedTime(from isoString: String) -> String {
+        guard let date = DateCalculationHelper.parseDate(isoString) else { return "--:--" }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        return fmt.string(from: date)
     }
 }
 
@@ -616,11 +948,13 @@ struct DynamicIslandExpandedBottom: View {
 struct DynamicIslandCompactLeading: View {
     let serviceType: String
     let lineName: String
-    
+
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: StyleHelper.getIcon(for: serviceType)).font(.caption)
-            Text(StyleHelper.getShortName(from: lineName)).font(.caption2).fontWeight(.bold)
+        HStack(spacing: 3) {
+            Image(systemName: StyleHelper.getIcon(for: serviceType))
+                .font(.system(size: 11, weight: .bold))
+            Text(StyleHelper.getShortName(from: lineName))
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
         }
         .foregroundColor(StyleHelper.getColor(for: serviceType))
     }
@@ -633,77 +967,77 @@ struct DynamicIslandCompactTrailing: View {
     let arrivalTimeISO: String
     let delay: Int?
     let phase: TripPhase
-    
-    var body: some View {
+    let currentTime: Date
+
+    /// Lokal berechnete Phase für sofortigen Übergang
+    private var localPhase: LocalPhaseCalculator.LocalPhase {
         if phase == .arrived {
+            return .arrived
+        }
+        return LocalPhaseCalculator.calculate(
+            departureTimeISO: departureTimeISO,
+            arrivalTimeISO: arrivalTimeISO,
+            delay: delay,
+            currentTime: currentTime
+        )
+    }
+
+    var body: some View {
+        switch localPhase {
+        case .arrived:
             Image(systemName: "checkmark.circle.fill")
-                .font(.caption)
+                .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.green)
                 .frame(width: 40, alignment: .trailing)
-        } else {
-            if phase == .beforeDeparture {
-                beforeDepartureCompactTimer(currentTime: Date())
-            } else {
-                duringJourneyCompactTimer(currentTime: Date())
-            }
+
+        case .departureMoment:
+            Text("Los!")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundColor(StyleHelper.getColor(for: phase == .arrived ? "BUS" : "STRASSENBAHN"))
+                .frame(width: 44, alignment: .trailing)
+
+        case .beforeDeparture, .duringJourney:
+            compactTimer
         }
     }
-    
+
     @ViewBuilder
-    private func beforeDepartureCompactTimer(currentTime: Date) -> some View {
-        if let delay = delay, delay > 0 {
-            if let totalRange = DateCalculationHelper.safeCalculateEstimatedDepartureDate(
-                from: departureTimeISO, delayMinutes: delay, currentTime: currentTime
-            ) {
-                Text(timerInterval: totalRange, countsDown: true)
-                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.red).frame(width: 40, alignment: .trailing)
-            } else {
-                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.red).frame(width: 40, alignment: .trailing)
-            }
+    private var compactTimer: some View {
+        let hasDelay = delay != nil && delay! > 0
+        let isoString = localPhase == .beforeDeparture ? departureTimeISO : arrivalTimeISO
+        let range = timerRange(for: isoString)
+        let color: Color = {
+            if hasDelay { return .orange }
+            if localPhase == .beforeDeparture { return .green }
+            return .blue
+        }()
+
+        if let range = range {
+            Text(timerInterval: range, countsDown: true)
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(color)
+                .contentTransition(.numericText(countsDown: true))
+                .frame(width: 44, alignment: .trailing)
         } else {
-            if let timeRange = DateCalculationHelper.safeCalculateDepartureDate(
-                from: departureTimeISO, currentTime: currentTime
-            ) {
-                Text(timerInterval: timeRange, countsDown: true)
-                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.green).frame(width: 40, alignment: .trailing)
-            } else {
-                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.green).frame(width: 40, alignment: .trailing)
-            }
+            Text("--:--")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(color.opacity(0.5))
+                .frame(width: 44, alignment: .trailing)
         }
     }
-    
-    @ViewBuilder
-    private func duringJourneyCompactTimer(currentTime: Date) -> some View {
-        if let delay = delay, delay > 0 {
-            if let totalRange = DateCalculationHelper.safeCalculateDelayedArrivalDate(
-                from: arrivalTimeISO,
-                delayMinutes: delay,
-                currentTime: currentTime
-            ) {
-                Text(timerInterval: totalRange, countsDown: true)
-                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
-            } else {
-                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
-            }
-        } else {
-            if let timeRange = DateCalculationHelper.safeCalculateRealArrivalDate(
-                from: arrivalTimeISO,
-                currentTime: currentTime
-            ) {
-                Text(timerInterval: timeRange, countsDown: true)
-                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
-            } else {
-                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
-                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
-            }
+
+    private func timerRange(for isoString: String) -> ClosedRange<Date>? {
+        if let d = delay, d > 0 {
+            guard let date = DateCalculationHelper.parseDate(isoString) else { return nil }
+            let delayed = date.addingTimeInterval(TimeInterval(d * 60))
+            guard delayed > currentTime else { return nil }
+            return currentTime...delayed
         }
+        guard let date = DateCalculationHelper.parseDate(isoString),
+              date > currentTime else { return nil }
+        return currentTime...date
     }
 }
 
@@ -714,50 +1048,51 @@ struct DynamicIslandMinimalView: View {
     let serviceType: String
     let delay: Int?
     let phase: TripPhase
-    
+
     var body: some View {
-        if phase == .arrived {
-            ZStack {
-                Circle().fill(Color.black).frame(width: 20, height: 20)
+        ZStack {
+            if phase == .arrived {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 19))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.green)
+            } else if let d = delay, d > 0 {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.orange)
+            } else if phase == .beforeDeparture {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.green)
+            } else {
+                Image(systemName: StyleHelper.getIcon(for: serviceType))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(StyleHelper.getColor(for: serviceType))
             }
-        } else {
-            let hasDelay = delay != nil && delay! > 0
-            
-            ZStack {
-                if phase == .beforeDeparture {
-                    beforeDepartureIcon(hasDelay: hasDelay)
-                } else {
-                    duringJourneyIcon(hasDelay: hasDelay)
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func beforeDepartureIcon(hasDelay: Bool) -> some View {
-        if hasDelay {
-            Circle().fill(Color.black).frame(width: 20, height: 20)
-            Image(systemName: "clock.fill").font(.system(size: 19)).foregroundColor(.red)
-        } else {
-            Circle().fill(Color.black).frame(width: 20, height: 20)
-            Image(systemName: "checkmark.circle.fill").font(.system(size: 19)).foregroundColor(.green)
-        }
-    }
-    
-    @ViewBuilder
-    private func duringJourneyIcon(hasDelay: Bool) -> some View {
-        if hasDelay {
-            Circle().fill(Color.black).frame(width: 25, height: 20)
-            Image(systemName: StyleHelper.getIcon(for: serviceType)).font(.caption).foregroundColor(.red)
-        } else {
-            Circle().fill(Color.black).frame(width: 25, height: 20)
-            Image(systemName: StyleHelper.getIcon(for: serviceType)).font(.caption).foregroundColor(.blue)
         }
     }
 }
+
+// MARK: - Status Badge View (kept for backward compatibility)
+
+struct StatusBadgeView: View {
+    let icon: String
+    let text: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon).font(.system(size: 9, weight: .semibold))
+            Text(text).font(.system(size: 10, weight: .bold))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 9).fill(color))
+    }
+}
+
+// MARK: - Legacy JourneyProgressView (alias)
+
+typealias JourneyProgressView = JourneyProgressBar
 
 // MARK: - Preview Helpers
 
@@ -765,11 +1100,11 @@ extension TripLiveActivityAttributes {
     static var previewBeforeDeparture: TripLiveActivityAttributes {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
+
         let now = Date()
         let departure = now.addingTimeInterval(180)
         let arrival = departure.addingTimeInterval(20 * 60)
-        
+
         return TripLiveActivityAttributes(
             tripId: UUID().uuidString,
             startStation: "Mannheim Hbf",
@@ -779,15 +1114,15 @@ extension TripLiveActivityAttributes {
             arrivalTimeISO: formatter.string(from: arrival)
         )
     }
-    
+
     static var previewDuringJourney: TripLiveActivityAttributes {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
+
         let now = Date()
         let departure = now.addingTimeInterval(-300)
         let arrival = now.addingTimeInterval(900)
-        
+
         return TripLiveActivityAttributes(
             tripId: UUID().uuidString,
             startStation: "Mannheim Hbf",
@@ -797,15 +1132,15 @@ extension TripLiveActivityAttributes {
             arrivalTimeISO: formatter.string(from: arrival)
         )
     }
-    
+
     static var previewArrived: TripLiveActivityAttributes {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
+
         let now = Date()
         let departure = now.addingTimeInterval(-1200)
         let arrival = now.addingTimeInterval(-60)
-        
+
         return TripLiveActivityAttributes(
             tripId: UUID().uuidString,
             startStation: "Mannheim Hbf",
@@ -822,23 +1157,39 @@ extension TripLiveActivityAttributes.ContentState {
         TripLiveActivityAttributes.ContentState(
             currentLegIndex: 0, nextStopName: "Mannheim Paradeplatz", nextStopTime: "14:32",
             estimatedTime: nil, delay: nil, destination: "Heidelberg Bismarckplatz",
-            lineName: "RNV 5", serviceType: "STRASSENBAHN", phase: .beforeDeparture
+            lineName: "Linie 5", serviceType: "STRASSENBAHN", phase: .beforeDeparture
         )
     }
-    
+
     static var delayed: TripLiveActivityAttributes.ContentState {
         TripLiveActivityAttributes.ContentState(
             currentLegIndex: 0, nextStopName: "Mannheim Paradeplatz", nextStopTime: "14:32",
             estimatedTime: "14:37", delay: 5, destination: "Heidelberg Bismarckplatz",
-            lineName: "RNV 5", serviceType: "STRASSENBAHN", phase: .beforeDeparture
+            lineName: "Linie 5", serviceType: "STRASSENBAHN", phase: .beforeDeparture
         )
     }
-    
+
+    static var duringJourney: TripLiveActivityAttributes.ContentState {
+        TripLiveActivityAttributes.ContentState(
+            currentLegIndex: 1, nextStopName: "Heidelberg Hbf", nextStopTime: "14:48",
+            estimatedTime: nil, delay: nil, destination: "Heidelberg Bismarckplatz",
+            lineName: "Linie 5", serviceType: "STRASSENBAHN", phase: .duringJourney
+        )
+    }
+
+    static var duringJourneyDelayed: TripLiveActivityAttributes.ContentState {
+        TripLiveActivityAttributes.ContentState(
+            currentLegIndex: 1, nextStopName: "Heidelberg Hbf", nextStopTime: "14:48",
+            estimatedTime: "14:53", delay: 5, destination: "Heidelberg Bismarckplatz",
+            lineName: "Linie 5", serviceType: "STRASSENBAHN", phase: .duringJourney
+        )
+    }
+
     static var arrived: TripLiveActivityAttributes.ContentState {
         TripLiveActivityAttributes.ContentState(
             currentLegIndex: 2, nextStopName: "Heidelberg Bismarckplatz", nextStopTime: "15:12",
             estimatedTime: nil, delay: nil, destination: "Heidelberg Bismarckplatz",
-            lineName: "RNV 5", serviceType: "STRASSENBAHN", phase: .arrived
+            lineName: "Linie 5", serviceType: "STRASSENBAHN", phase: .arrived
         )
     }
 }

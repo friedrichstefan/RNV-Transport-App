@@ -22,7 +22,7 @@ class SecureGraphQLService: GraphQLService {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
 
         config.httpAdditionalHeaders = [
-            "User-Agent": "RNVApp/1.0 iOS",
+            "User-Agent": "OEPNVMannheim/1.1 iOS",
             "Accept": "application/json",
             "Cache-Control": "no-cache"
         ]
@@ -86,7 +86,7 @@ class SecureGraphQLService: GraphQLService {
 
         SSLPinningDelegate.extractCertificateHash(for: "graphql-sandbox-dds.rnv-online.de") { hash in
             if let hash = hash {
-                print("📋 [SETUP] RNV GraphQL Certificate Hash: \(hash)")
+                print("📋 [SETUP] GraphQL Certificate Hash: \(hash)")
             }
         }
 

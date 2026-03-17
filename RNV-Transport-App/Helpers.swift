@@ -147,8 +147,13 @@ struct TransportIconHelper {
         }
     }
 
+    /// Entfernt Präfixe aus Liniennamen für kompaktere Darstellung
     static func getShortLineName(from serviceName: String?) -> String {
         guard let name = serviceName else { return "?" }
-        return name.replacingOccurrences(of: "RNV ", with: "")
+        // Entferne bekannte Präfixe
+        return name
+            .replacingOccurrences(of: "RNV ", with: "")
+            .replacingOccurrences(of: "rnv ", with: "")
+            .replacingOccurrences(of: "Linie ", with: "")
     }
 }

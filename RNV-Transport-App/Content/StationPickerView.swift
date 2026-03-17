@@ -55,7 +55,7 @@ struct StationPickerView: View {
                     Button("Abbrechen") {
                         dismiss()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundStyle(AppTheme.primaryColor)
                 }
             }
         }
@@ -117,13 +117,7 @@ struct StationPickerView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.blue, Color.blue.opacity(0.8)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(AppTheme.accentGradient)
             )
         }
         .disabled(locationManager.location == nil)
@@ -136,7 +130,7 @@ struct StationPickerView: View {
         VStack(spacing: 16) {
             Spacer()
             ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.primaryColor))
                 .scaleEffect(1.5)
             Text("Suche Haltestellen...")
                 .font(.subheadline)
@@ -239,7 +233,7 @@ struct StationRow: View {
             HStack(spacing: 12) {
                 Image(systemName: "tram.fill")
                     .font(.system(size: 24))
-                    .foregroundColor(.blue)
+                    .foregroundStyle(AppTheme.primaryColor)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(station.longName)

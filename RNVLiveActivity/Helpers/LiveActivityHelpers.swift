@@ -97,6 +97,9 @@ struct StyleHelper {
     }
 
     static func getShortName(from serviceName: String) -> String {
-        serviceName.replacingOccurrences(of: "RNV ", with: "")
+        serviceName
+            .replacingOccurrences(of: "RNV ", with: "")
+            .replacingOccurrences(of: "rnv ", with: "")
+            .replacingOccurrences(of: "Linie ", with: "")
     }
 }
