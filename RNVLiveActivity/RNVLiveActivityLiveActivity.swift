@@ -14,16 +14,15 @@ struct RNVLiveActivityLiveActivity: Widget {
         ActivityConfiguration(for: TripLiveActivityAttributes.self) { context in
             
             // MARK: Lock Screen Widget
-            TimelineView(.periodic(from: Date(), by: 1.0)) { timeline in
-                ContentMediumView(
-                    context: context,
-                    isBeforeDeparture: DateCalculationHelper.isBeforeDeparture(
-                        context.attributes.departureTimeISO,
-                        at: timeline.date
-                    ),
-                    currentTime: timeline.date
-                )
-            }
+            ContentMediumView(
+                context: context,
+                isBeforeDeparture: DateCalculationHelper.isBeforeDeparture(
+                    context.attributes.departureTimeISO,
+                    at: Date(),
+                    delay: context.state.delay
+                ),
+                currentTime: Date()
+            )
 
         } dynamicIsland: { context in
             DynamicIsland {
@@ -59,7 +58,7 @@ struct RNVLiveActivityLiveActivity: Widget {
                         serviceType: context.state.serviceType,
                         delay: context.state.delay,
                         phase: context.state.phase,
-                        tripId: context.attributes.tripId  // ✅ NEU
+                        tripId: context.attributes.tripId
                     )
                 }
                 
@@ -74,29 +73,23 @@ struct RNVLiveActivityLiveActivity: Widget {
             } compactTrailing: {
                 
                 // MARK: Compact - Trailing
-                TimelineView(.periodic(from: Date(), by: 1.0)) { timeline in
-                    DynamicIslandCompactTrailing(
-                        departureTimeISO: context.attributes.departureTimeISO,
-                        arrivalTimeISO: context.attributes.arrivalTimeISO,
-                        delay: context.state.delay,
-                        currentTime: timeline.date,
-                        phase: context.state.phase
-                    )
-                }
+                DynamicIslandCompactTrailing(
+                    departureTimeISO: context.attributes.departureTimeISO,
+                    arrivalTimeISO: context.attributes.arrivalTimeISO,
+                    delay: context.state.delay,
+                    phase: context.state.phase
+                )
                 .animation(.easeInOut(duration: 0.3), value: context.state.phase)
-                
             } minimal: {
                 
                 // MARK: Minimal
-                TimelineView(.periodic(from: Date(), by: 1.0)) { timeline in
-                    DynamicIslandMinimalView(
-                        departureTimeISO: context.attributes.departureTimeISO,
-                        serviceType: context.state.serviceType,
-                        delay: context.state.delay,
-                        currentTime: timeline.date,
-                        phase: context.state.phase
-                    )
-                }
+                // ✅ OHNE TimelineView - DynamicIslandMinimalView hat bereits eine intern!
+                DynamicIslandMinimalView(
+                    departureTimeISO: context.attributes.departureTimeISO,
+                    serviceType: context.state.serviceType,
+                    delay: context.state.delay,
+                    phase: context.state.phase
+                )
                 .animation(.easeInOut(duration: 0.3), value: context.state.phase)
             }
             .keylineTint(StyleHelper.getColor(for: context.state.serviceType))
@@ -104,9 +97,7 @@ struct RNVLiveActivityLiveActivity: Widget {
     }
 }
 
-// ========================================
 // MARK: - Previews
-// ========================================
 
 #Preview("1. Vor Abfahrt (Pünktlich)", as: .dynamicIsland(.compact), using: TripLiveActivityAttributes.previewBeforeDeparture) {
    RNVLiveActivityLiveActivity()

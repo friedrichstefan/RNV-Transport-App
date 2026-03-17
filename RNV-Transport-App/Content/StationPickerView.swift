@@ -14,29 +14,29 @@ struct StationPickerView: View {
     @ObservedObject var graphQLService: GraphQLService
     @ObservedObject var locationManager: LocationManager
     @Binding var selectedStation: Station?
-    
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var hasLoadedStations = false
     @State private var searchText = ""
-    @State private var searchDebounceTimer: Timer?
-    
+    @State private var searchDebounceTask: Task<Void, Never>?
+
     var body: some View {
         NavigationView {
             ZStack {
                 Color(colorScheme == .dark ? .black : .systemGroupedBackground)
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     searchField
                         .padding()
-                    
+
                     if searchText.isEmpty && !hasLoadedStations {
                         nearbyButton
                             .padding(.horizontal)
                             .padding(.bottom, 16)
                     }
-                    
+
                     if graphQLService.isLoading {
                         loadingView
                     } else if !graphQLService.stations.isEmpty {
@@ -59,23 +59,26 @@ struct StationPickerView: View {
                 }
             }
         }
-        .onChange(of: searchText) { oldValue, newValue in
+        .onChange(of: searchText) { newValue in
             handleSearchTextChange(newValue)
         }
+        .onDisappear {
+            searchDebounceTask?.cancel()
+        }
     }
-    
+
     // MARK: - Search Field
-    
+
     private var searchField: some View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
                 .font(.system(size: 16, weight: .medium))
-            
+
             TextField("Haltestelle suchen", text: $searchText)
                 .textFieldStyle(PlainTextFieldStyle())
                 .autocorrectionDisabled()
-            
+
             if !searchText.isEmpty {
                 Button(action: {
                     searchText = ""
@@ -98,9 +101,9 @@ struct StationPickerView: View {
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
     }
-    
+
     // MARK: - Nearby Button
-    
+
     private var nearbyButton: some View {
         Button(action: loadNearbyStations) {
             HStack(spacing: 12) {
@@ -126,9 +129,9 @@ struct StationPickerView: View {
         .disabled(locationManager.location == nil)
         .opacity(locationManager.location == nil ? 0.5 : 1.0)
     }
-    
+
     // MARK: - Loading View
-    
+
     private var loadingView: some View {
         VStack(spacing: 16) {
             Spacer()
@@ -141,9 +144,9 @@ struct StationPickerView: View {
             Spacer()
         }
     }
-    
+
     // MARK: - Station List
-    
+
     private var stationList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
@@ -157,9 +160,9 @@ struct StationPickerView: View {
             .padding()
         }
     }
-    
+
     // MARK: - Empty State
-    
+
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Spacer()
@@ -175,44 +178,44 @@ struct StationPickerView: View {
             Spacer()
         }
     }
-    
+
     // MARK: - Search Handling
-    
+
     private func handleSearchTextChange(_ newValue: String) {
-        searchDebounceTimer?.invalidate()
-        
+        searchDebounceTask?.cancel()
+
         guard !newValue.isEmpty else {
             graphQLService.stations = []
             hasLoadedStations = false
             return
         }
-        
-        searchDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
-            Task {
-                await searchStations(query: newValue)
-            }
+
+        searchDebounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            await searchStations(query: newValue)
         }
     }
-    
+
     private func searchStations(query: String) async {
         guard let accessToken = authService.accessToken else { return }
-        
+
         hasLoadedStations = true
-        
+
         await graphQLService.searchStationsByName(
             name: query,
             accessToken: accessToken
         )
     }
-    
+
     private func loadNearbyStations() {
         guard let location = locationManager.location,
               let accessToken = authService.accessToken else {
             return
         }
-        
+
         hasLoadedStations = true
-        
+
         Task {
             await graphQLService.searchStations(
                 lat: location.latitude,
@@ -228,30 +231,30 @@ struct StationPickerView: View {
 struct StationRow: View {
     let station: Station
     let action: () -> Void
-    
+
     @Environment(\.colorScheme) private var colorScheme
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: "tram.fill.circle.fill")
+                Image(systemName: "tram.fill")
                     .font(.system(size: 24))
                     .foregroundColor(.blue)
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(station.longName)
                         .font(.body)
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
                         .lineLimit(2)
-                    
+
                     Text("ID: \(station.hafasID)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.secondary)

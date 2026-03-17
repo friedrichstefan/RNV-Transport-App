@@ -65,8 +65,8 @@
 		395F20CA2F12A67C00BC7030 /* Exceptions for "RNV-Transport-App" folder in "RNVLiveActivityExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AppConfiguration.swift,
 				EndAllActivitiesIntent.swift,
-				LiveActivityState.swift,
 				SharedModels.swift,
 			);
 			target = 395F20A62F128DB500BC7030 /* RNVLiveActivityExtension */;

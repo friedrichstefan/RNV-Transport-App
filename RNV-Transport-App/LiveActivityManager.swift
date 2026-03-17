@@ -21,6 +21,7 @@ class LiveActivityManager: ObservableObject {
     private var updateTimers: [String: Timer] = [:]
     private var graphQLService: GraphQLService?
     private var accessToken: String = ""
+    private let formatter = DateFormattingHelper.shared
     
     // MARK: - Initialization
     
@@ -29,7 +30,7 @@ class LiveActivityManager: ObservableObject {
         print("📱 [INIT] LiveActivityManager initialisiert")
     }
     
-    // MARK: - Live Activity starten mit Auto-Updates
+    // MARK: - Live Activity starten
     
     func startActivity(for trip: DetailedTrip, accessToken: String) async {
         print("🔍 [DEBUG] startActivity aufgerufen für Trip: \(trip.id)")
@@ -49,7 +50,7 @@ class LiveActivityManager: ObservableObject {
             return
         }
         
-        guard let firstTimedLeg = trip.legs.first(where: { $0.type == "TimedLeg" }) else {
+        guard let firstTimedLeg = trip.legs.first(where: { $0.isTimedLeg }) else {
             let error = "Keine TimedLeg gefunden"
             print("⚠️ [WARNING] \(error)")
             await MainActor.run {
@@ -57,13 +58,6 @@ class LiveActivityManager: ObservableObject {
             }
             return
         }
-        
-        print("🔍 [DEBUG] Erste TimedLeg gefunden:")
-        print("  - boardStopName: \(firstTimedLeg.boardStopName ?? "nil")")
-        print("  - departureTime: \(firstTimedLeg.departureTime ?? "nil")")
-        print("  - serviceName: \(firstTimedLeg.serviceName ?? "nil")")
-        print("  - serviceType: \(firstTimedLeg.serviceType ?? "nil")")
-        print("  - destinationLabel: \(firstTimedLeg.destinationLabel ?? "nil")")
         
         guard let boardStop = firstTimedLeg.boardStopName,
               let departureTime = firstTimedLeg.departureTime,
@@ -78,45 +72,36 @@ class LiveActivityManager: ObservableObject {
             return
         }
         
-        let lastLeg = trip.legs.last { $0.type == "TimedLeg" }
+        let lastLeg = trip.legs.last { $0.isTimedLeg }
         let arrivalTime = lastLeg?.arrivalTime ?? trip.endTime
-        
-        print("🔍 [DEBUG] Ankunftszeit: \(arrivalTime)")
         
         let attributes = TripLiveActivityAttributes(
             tripId: trip.id.uuidString,
             startStation: boardStop,
             endStation: trip.legs.last?.alightStopName ?? "Ziel",
-            totalLegs: trip.legs.filter { $0.type == "TimedLeg" }.count,
+            totalLegs: trip.legs.filter { $0.isTimedLeg }.count,
             departureTimeISO: departureTime,
             arrivalTimeISO: arrivalTime
+        )
+        
+        let initialDelay = formatter.calculateDelay(
+            timetabled: departureTime,
+            estimated: firstTimedLeg.estimatedDepartureTime
         )
         
         let initialState = TripLiveActivityAttributes.ContentState(
             currentLegIndex: 0,
             nextStopName: boardStop,
-            nextStopTime: formatTime(departureTime),
-            estimatedTime: firstTimedLeg.estimatedDepartureTime.map { formatTime($0) },
-            delay: calculateDelay(
-                timetabled: departureTime,
-                estimated: firstTimedLeg.estimatedDepartureTime
-            ),
+            nextStopTime: formatter.formatTime(departureTime),
+            estimatedTime: firstTimedLeg.estimatedDepartureTime.map { formatter.formatTime($0) },
+            delay: initialDelay,
             destination: destination,
             lineName: serviceName,
             serviceType: serviceType,
             phase: .beforeDeparture
         )
         
-        print("🔍 [DEBUG] Attributes erstellt:")
-        print("  - tripId: \(attributes.tripId)")
-        print("  - startStation: \(attributes.startStation)")
-        print("  - endStation: \(attributes.endStation)")
-        print("  - departureTimeISO: \(attributes.departureTimeISO)")
-        print("  - arrivalTimeISO: \(attributes.arrivalTimeISO)")
-        
         do {
-            print("🔄 [DEBUG] Versuche Activity.request...")
-            
             let activity = try Activity.request(
                 attributes: attributes,
                 content: .init(state: initialState, staleDate: nil),
@@ -125,25 +110,17 @@ class LiveActivityManager: ObservableObject {
             
             print("✅ [SUCCESS] Activity erfolgreich erstellt!")
             print("  - Activity ID: \(activity.id)")
-            print("  - Activity State: \(activity.activityState)")
             
             await MainActor.run {
                 self.activeActivities[trip.id.uuidString] = activity
                 self.lastError = nil
             }
             
-            await MainActor.run {
-                self.startAutoUpdates(for: trip)
-            }
-            
-            schedulePhaseTransition(for: trip)
-            scheduleArrivalTransition(for: trip)
+            await startAutoUpdates(for: trip)
             
         } catch let error as NSError {
             let errorMsg = "Fehler beim Starten: \(error.localizedDescription) (Code: \(error.code))"
             print("❌ [ERROR] \(errorMsg)")
-            print("   Domain: \(error.domain)")
-            print("   UserInfo: \(error.userInfo)")
             
             await MainActor.run {
                 self.lastError = errorMsg
@@ -158,134 +135,25 @@ class LiveActivityManager: ObservableObject {
         }
     }
     
-    // MARK: - Automatische Phase-Erkennung
+    // MARK: - Automatische Updates mit adaptivem Intervall
     
-    private func schedulePhaseTransition(for trip: DetailedTrip) {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let firstTimedLeg = trip.legs.first(where: { $0.type == "TimedLeg" }),
-              let departureTime = firstTimedLeg.departureTime,
-              let departureDate = formatter.date(from: departureTime) else {
-            print("⚠️ [WARNING] Kann Abfahrtszeit nicht parsen")
-            return
-        }
-        
-        let now = Date()
-        let timeUntilDeparture = departureDate.timeIntervalSince(now)
-        
-        if timeUntilDeparture > 0 {
-            print("⏰ [SCHEDULE] Phase-Übergang zu 'duringJourney' in \(Int(timeUntilDeparture)) Sekunden")
-            
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(timeUntilDeparture * 1_000_000_000))
-                await transitionToDuringJourney(for: trip)
-            }
-        } else {
-            print("ℹ️ [INFO] Fahrt bereits gestartet")
-        }
-    }
-    
-    private func transitionToDuringJourney(for trip: DetailedTrip) async {
-        print("🔄 [TRANSITION] Wechsle zu 'duringJourney'-Phase")
-        
-        guard let activity = await MainActor.run(body: { activeActivities[trip.id.uuidString] }) else {
-            print("⚠️ [WARNING] Keine aktive Activity gefunden")
-            return
-        }
-        
-        guard let currentLeg = getCurrentLeg(for: trip),
-              let boardStop = currentLeg.boardStopName,
-              let departureTime = currentLeg.departureTime,
-              let serviceName = currentLeg.serviceName,
-              let serviceType = currentLeg.serviceType,
-              let destination = currentLeg.destinationLabel else {
-            print("⚠️ [WARNING] Unvollständige Leg-Daten")
-            return
-        }
-        
-        let newState = TripLiveActivityAttributes.ContentState(
-            currentLegIndex: 1,
-            nextStopName: boardStop,
-            nextStopTime: formatTime(departureTime),
-            estimatedTime: currentLeg.estimatedDepartureTime.map { formatTime($0) },
-            delay: calculateDelay(
-                timetabled: departureTime,
-                estimated: currentLeg.estimatedDepartureTime
-            ),
-            destination: destination,
-            lineName: serviceName,
-            serviceType: serviceType,
-            phase: .duringJourney
-        )
-        
-    }
-    
-    // MARK: - Ankunfts-Übergang planen
-    
-    private func scheduleArrivalTransition(for trip: DetailedTrip) {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        let lastLeg = trip.legs.last { $0.type == "TimedLeg" }
-        let arrivalTime = lastLeg?.arrivalTime ?? trip.endTime
-        
-        guard let arrivalDate = formatter.date(from: arrivalTime) else {
-            print("⚠️ [WARNING] Kann Ankunftszeit nicht parsen")
-            return
-        }
-        
-        let now = Date()
-        let timeUntilArrival = arrivalDate.timeIntervalSince(now)
-        
-        if timeUntilArrival > 0 {
-            print("⏰ [SCHEDULE] Phase-Übergang zu 'arrived' in \(Int(timeUntilArrival)) Sekunden")
-            
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(timeUntilArrival * 1_000_000_000))
-                await transitionToArrived(for: trip)
-            }
-        } else {
-            print("ℹ️ [INFO] Bereits angekommen")
-        }
-    }
-    
-    private func transitionToArrived(for trip: DetailedTrip) async {
-        print("🎯 [TRANSITION] Wechsle zu 'arrived'-Phase")
-        
-        guard let activity = await MainActor.run(body: { activeActivities[trip.id.uuidString] }) else {
-            print("⚠️ [WARNING] Keine aktive Activity gefunden")
-            return
-        }
-        
-        var currentState = activity.content.state
-        currentState.phase = .arrived
-        
-    }
-    
-    // MARK: - Automatische Updates
-    
-    private func startAutoUpdates(for trip: DetailedTrip) {
+    private func startAutoUpdates(for trip: DetailedTrip) async {
         let tripId = trip.id.uuidString
-        
-        updateTimers[tripId]?.invalidate()
-        updateTimers.removeValue(forKey: tripId)
-        
-        print("⏰ [DEBUG] Starte Auto-Update Timer für Trip: \(tripId)")
-        
-        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task {
-                await self?.fetchAndUpdateLiveActivity(trip: trip)
+
+        print("⏰ [DEBUG] Starte Auto-Update für Trip: \(String(tripId.prefix(8)))")
+
+        // Timer muss auf Main RunLoop erstellt werden, damit er korrekt feuert
+        await MainActor.run {
+            updateTimers[tripId]?.invalidate()
+            updateTimers.removeValue(forKey: tripId)
+
+            let startTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
+                Task {
+                    await self?.fetchAndUpdateLiveActivity(trip: trip)
+                }
             }
-        }
-        
-        RunLoop.main.add(timer, forMode: .common)
-        updateTimers[tripId] = timer
-        
-        print("✅ [SUCCESS] Auto-Update Timer gestartet (1s Intervall)")
-        
-        Task {
-            await fetchAndUpdateLiveActivity(trip: trip)
+            RunLoop.main.add(startTimer, forMode: .common)
+            updateTimers[tripId] = startTimer
         }
     }
     
@@ -303,10 +171,12 @@ class LiveActivityManager: ObservableObject {
             return
         }
         
-        let currentPhase = await activity.content.state.phase
-        if currentPhase == .arrived {
-            return
-        }
+        // ✅ WICHTIG: Aktuelle Phase erkennen
+        let now = Date()
+        let isBeforeDeparture = formatter.isBeforeDeparture(trip.legs.first(where: { $0.isTimedLeg })?.departureTime ?? trip.startTime, at: now)
+        let isArrived = formatter.isArrived(trip.legs.last(where: { $0.isTimedLeg })?.arrivalTime ?? trip.endTime, at: now)
+        
+        let currentPhase: TripPhase = isArrived ? .arrived : (isBeforeDeparture ? .beforeDeparture : .duringJourney)
         
         guard let currentLeg = getCurrentLeg(for: trip),
               let boardStop = currentLeg.boardStopName,
@@ -322,7 +192,7 @@ class LiveActivityManager: ObservableObject {
             leg.departureTime == currentLeg.departureTime
         }) ?? 0
         
-        let delay = calculateDelay(
+        let delay = formatter.calculateDelay(
             timetabled: departureTime,
             estimated: currentLeg.estimatedDepartureTime
         )
@@ -330,8 +200,8 @@ class LiveActivityManager: ObservableObject {
         let newState = TripLiveActivityAttributes.ContentState(
             currentLegIndex: currentLegIndex,
             nextStopName: boardStop,
-            nextStopTime: formatTime(departureTime),
-            estimatedTime: currentLeg.estimatedDepartureTime.map { formatTime($0) },
+            nextStopTime: formatter.formatTime(departureTime),
+            estimatedTime: currentLeg.estimatedDepartureTime.map { formatter.formatTime($0) },
             delay: delay,
             destination: destination,
             lineName: serviceName,
@@ -339,17 +209,40 @@ class LiveActivityManager: ObservableObject {
             phase: currentPhase
         )
         
+        // ✅ STATE AKTUALISIEREN!
+        await activity.update(
+            ActivityContent(state: newState, staleDate: nil)
+        )
+        
+        // ✅ Nächster Update mit adaptivem Intervall
+        let nextInterval = getUpdateInterval(
+            departureTimeISO: trip.legs.first(where: { $0.isTimedLeg })?.departureTime ?? trip.startTime,
+            arrivalTimeISO: trip.legs.last(where: { $0.isTimedLeg })?.arrivalTime ?? trip.endTime,
+            currentTime: now
+        )
+        
+        let tripId = trip.id.uuidString
+        await MainActor.run {
+            updateTimers[tripId]?.invalidate()
+            
+            let nextTimer = Timer.scheduledTimer(withTimeInterval: nextInterval, repeats: false) { [weak self] _ in
+                Task {
+                    await self?.fetchAndUpdateLiveActivity(trip: trip)
+                }
+            }
+            
+            updateTimers[tripId] = nextTimer
+            
+            print("⏰ [UPDATE] Nächster Update in \(Int(nextInterval))s für Phase: \(currentPhase)")
+        }
     }
     
     private func getCurrentLeg(for trip: DetailedTrip) -> TripLeg? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
         let now = Date()
         
-        for leg in trip.legs where leg.type == "TimedLeg" {
+        for leg in trip.legs where leg.isTimedLeg {
             if let departureTimeString = leg.departureTime,
-               let departureDate = formatter.date(from: departureTimeString) {
+               let departureDate = formatter.parseISO8601(departureTimeString) {
                 
                 if departureDate > now {
                     return leg
@@ -357,18 +250,18 @@ class LiveActivityManager: ObservableObject {
             }
         }
         
-        return trip.legs.last { $0.type == "TimedLeg" }
+        return trip.legs.last { $0.isTimedLeg }
     }
     
     // MARK: - Live Activity beenden
     
     func endActivity(tripId: String) async {
-        print("🛑 [DEBUG] endActivity für Trip: \(tripId)")
+        print("🛑 [DEBUG] endActivity für Trip: \(String(tripId.prefix(8)))")
         
         await MainActor.run {
             updateTimers[tripId]?.invalidate()
             updateTimers.removeValue(forKey: tripId)
-            print("⏰ [DEBUG] Timer gestoppt für Trip: \(tripId)")
+            print("⏰ [DEBUG] Timer gestoppt für Trip: \(String(tripId.prefix(8)))")
         }
         
         guard let activity = await MainActor.run(body: { activeActivities[tripId] }) else {
@@ -376,10 +269,8 @@ class LiveActivityManager: ObservableObject {
             return
         }
         
-        await activity.end(
-            ActivityContent(state: activity.content.state, staleDate: nil),
-            dismissalPolicy: .default
-        )
+        // ✅ RICHTIG
+        await activity.end(nil, dismissalPolicy: .immediate)
         
         await MainActor.run {
             self.activeActivities.removeValue(forKey: tripId)
@@ -423,16 +314,12 @@ class LiveActivityManager: ObservableObject {
             
             // Activity beenden
             if let activity = await MainActor.run(body: { self.activeActivities[tripId] }) {
-                await activity.end(
-                    ActivityContent(state: activity.content.state, staleDate: nil),
-                    dismissalPolicy: .immediate
-                )
+                // ✅ RICHTIG
+                await activity.end(nil, dismissalPolicy: .immediate)
             }
             
-            // State in UserDefaults zurücksetzen
+            // State zurücksetzen
             LiveActivityState.shared.setTripActive(tripId, isActive: false)
-            
-            print("✅ [CLEANUP] Trip \(tripId) beendet und Toggle zurückgesetzt")
         }
         
         // Dictionary leeren
@@ -440,56 +327,57 @@ class LiveActivityManager: ObservableObject {
             self.activeActivities.removeAll()
         }
         
-        print("✅ [SUCCESS] Alle Live Activities beendet und alle Toggles zurückgesetzt")
+        print("✅ [SUCCESS] Alle Live Activities beendet und Toggles zurückgesetzt")
     }
     
-    // MARK: - Helper: Zeit formatieren
-    
-    private func formatTime(_ isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let date = formatter.date(from: isoString) else {
-            return isoString
+    // MARK: - Adaptives Update-Intervall
+
+    private func getUpdateInterval(
+        departureTimeISO: String,
+        arrivalTimeISO: String,
+        currentTime: Date = Date()
+    ) -> TimeInterval {
+        guard let departureDate = formatter.parseISO8601(departureTimeISO),
+              let arrivalDate = formatter.parseISO8601(arrivalTimeISO) else {
+            return 30 // Default
         }
-        
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HH:mm"
-        timeFormatter.timeZone = .current
-        return timeFormatter.string(from: date)
+
+        let timeUntilDeparture = departureDate.timeIntervalSince(currentTime)
+        let timeUntilArrival = arrivalDate.timeIntervalSince(currentTime)
+
+        if timeUntilDeparture > 0 {
+            // Vor Abfahrt: Je näher desto häufiger
+            if timeUntilDeparture > 600 { return 60 }
+            else if timeUntilDeparture > 300 { return 30 }
+            else { return 15 }
+        } else if timeUntilArrival > 0 {
+            // Während der Fahrt: Je näher desto häufiger
+            if timeUntilArrival > 600 { return 30 }
+            else { return 15 }
+        }
+
+        return 60 // Nach Ankunft selten
     }
-    
-    // MARK: - Helper: Verspätung berechnen
-    
-    private func calculateDelay(timetabled: String, estimated: String?) -> Int? {
-        guard let estimatedString = estimated else {
-            return nil
-        }
-        
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let timetabledDate = formatter.date(from: timetabled),
-              let estimatedDate = formatter.date(from: estimatedString) else {
-            return nil
-        }
-        
-        let delaySeconds = estimatedDate.timeIntervalSince(timetabledDate)
-        let delayMinutes = Int(delaySeconds / 60)
-        
-        return delayMinutes > 0 ? delayMinutes : nil
-    }
-    
+
     // MARK: - Deinit
-    
+
     deinit {
         print("🗑️ [DEINIT] LiveActivityManager wird freigegeben")
-        
-        for (tripId, timer) in updateTimers {
-            timer.invalidate()
-            print("⏰ [CLEANUP] Timer gestoppt für Trip: \(tripId)")
+
+        // Timer muss vom selben Thread (Main) invalidiert werden, auf dem er erstellt wurde
+        let timersToStop = updateTimers
+        let block = {
+            for (tripId, timer) in timersToStop {
+                timer.invalidate()
+                print("⏰ [CLEANUP] Timer gestoppt für Trip: \(String(tripId.prefix(8)))")
+            }
         }
-        updateTimers.removeAll()
+
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.sync(execute: block)
+        }
     }
 }
 

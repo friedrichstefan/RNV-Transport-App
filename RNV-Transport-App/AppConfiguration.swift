@@ -1,3 +1,11 @@
+//
+//  AppConfiguration.swift
+//  RNV-Transport-App
+//
+//  Created by Friedrich, Stefan on 21.01.26.
+//
+
+
 import Foundation
 
 struct AppConfiguration {

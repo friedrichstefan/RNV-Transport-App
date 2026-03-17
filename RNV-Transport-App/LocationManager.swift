@@ -22,7 +22,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
     }
     
-    // ✅ Auto-Request mit Permission-Check
+    // MARK: - Location Requests
+    
     func autoRequestLocation() async {
         await requestPermission()
     }
@@ -54,10 +55,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.stopUpdatingLocation()
     }
     
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
         DispatchQueue.main.async {
             self.authorizationStatus = status
-            
+
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 self.startLocationUpdates()
             }

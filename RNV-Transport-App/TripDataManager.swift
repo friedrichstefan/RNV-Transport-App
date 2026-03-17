@@ -11,7 +11,7 @@ class TripDataManager {
     static let shared = TripDataManager()
     
     private let tripDataKey = "savedTripData"
-    private let appGroupID = "group.com.yourcompany.rnvapp" // Gleiche ID wie LiveActivityState
+    private let appGroupID = AppConfiguration.appGroupID  // ✅ ZENTRAL
     
     private var userDefaults: UserDefaults? {
         UserDefaults(suiteName: appGroupID)
@@ -36,6 +36,11 @@ class TripDataManager {
                 endStation: trip.legs.last?.alightStopName ?? "",
                 legs: trip.legs.map { leg in
                     TripLegData(
+                        legType: leg.type.rawValue,
+                        boardStopName: leg.boardStopName,
+                        alightStopName: leg.alightStopName,
+                        departureTime: leg.departureTime,
+                        arrivalTime: leg.arrivalTime,
                         serviceName: leg.serviceName,
                         serviceType: leg.serviceType,
                         destinationLabel: leg.destinationLabel
@@ -43,10 +48,7 @@ class TripDataManager {
                 }
             )
             
-            let encoded = try encoder.encode(tripData)
-            
             var savedTrips = getSavedTrips()
-            // Ersetze existierenden Trip oder füge neuen hinzu
             savedTrips.removeAll { $0.id == tripData.id }
             savedTrips.append(tripData)
             
@@ -54,7 +56,7 @@ class TripDataManager {
             defaults.set(allEncoded, forKey: tripDataKey)
             defaults.synchronize()
             
-            print("✅ [TRIPDATA] Trip gespeichert: \(trip.id)")
+            print("✅ [TRIPDATA] Trip gespeichert: \(String(trip.id.uuidString.prefix(8)))")
             
         } catch {
             print("❌ [TRIPDATA] Fehler beim Speichern: \(error)")
@@ -82,7 +84,7 @@ class TripDataManager {
             defaults.set(encoded, forKey: tripDataKey)
             defaults.synchronize()
             
-            print("✅ [TRIPDATA] Trip entfernt: \(tripId)")
+            print("✅ [TRIPDATA] Trip entfernt: \(String(tripId.prefix(8)))")
         } catch {
             print("❌ [TRIPDATA] Fehler beim Entfernen: \(error)")
         }
@@ -104,6 +106,32 @@ class TripDataManager {
             return []
         }
     }
+    
+    // ✅ NEU: Cleanup alte Daten
+    func removeExpiredTrips() {
+        let now = Date()
+        let formatter = DateFormattingHelper.shared
+        
+        var savedTrips = getSavedTrips()
+        let initialCount = savedTrips.count
+        
+        savedTrips.removeAll { trip in
+            guard let arrivalDate = formatter.parseISO8601(trip.endTime) else { return false }
+            return now.timeIntervalSince(arrivalDate) > 86400 // 24 Stunden
+        }
+        
+        if savedTrips.count < initialCount {
+            do {
+                let encoder = JSONEncoder()
+                let encoded = try encoder.encode(savedTrips)
+                userDefaults?.set(encoded, forKey: tripDataKey)
+                userDefaults?.synchronize()
+                print("✅ [TRIPDATA] \(initialCount - savedTrips.count) abgelaufene Trips entfernt")
+            } catch {
+                print("❌ [TRIPDATA] Fehler beim Cleanup: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - Trip Data Models
@@ -119,6 +147,11 @@ struct TripData: Codable {
 }
 
 struct TripLegData: Codable {
+    let legType: String?
+    let boardStopName: String?
+    let alightStopName: String?
+    let departureTime: String?
+    let arrivalTime: String?
     let serviceName: String?
     let serviceType: String?
     let destinationLabel: String?

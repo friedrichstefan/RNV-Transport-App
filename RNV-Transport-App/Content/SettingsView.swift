@@ -28,7 +28,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                // MARK: - Standort
+                // MARK: - Location Section
                 Section {
                     HStack {
                         Image(systemName: "location.fill")
@@ -62,7 +62,7 @@ struct SettingsView: View {
                     Label("Standort", systemImage: "location.circle")
                 }
                 
-                // MARK: - Live Activity
+                // MARK: - Live Activity Section
                 Section {
                     Toggle("Live-Verfolgung automatisch starten", isOn: $autoStartLiveActivity)
                     Toggle("Push-Benachrichtigungen", isOn: $notificationsEnabled)
@@ -74,7 +74,7 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // MARK: - Verbindungssuche
+                // MARK: - Search Section
                 Section {
                     Toggle("Nur verspätete Verbindungen", isOn: $showDelaysOnly)
                     
@@ -97,7 +97,7 @@ struct SettingsView: View {
                     Label("Verbindungssuche", systemImage: "magnifyingglass")
                 }
                 
-                // MARK: - Verkehrsmittel
+                // MARK: - Transport Modes
                 Section {
                     Toggle(isOn: $enableTram) {
                         HStack {
@@ -130,7 +130,7 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // MARK: - Datenverwaltung
+                // MARK: - Data Management
                 Section {
                     Button(role: .destructive, action: {
                         showingResetAlert = true
@@ -161,7 +161,7 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // MARK: - Entwickler
+                // MARK: - Developer Section
                 Section {
                     Toggle("Entwicklermodus", isOn: $developerMode)
                     
@@ -203,30 +203,42 @@ struct SettingsView: View {
                                 }
                             }
                         }
+                        
+                        // ✅ NEU: Debug Helper
+                        Button(action: {
+                            LiveActivityState.shared.debugPrintState()
+                        }) {
+                            HStack {
+                                Image(systemName: "bug.fill")
+                                    .foregroundColor(.red)
+                                Text("Debug: State ausdrucken")
+                                    .foregroundColor(.primary)
+                            }
+                        }
                     }
                 } header: {
                     Label("Entwickler", systemImage: "hammer.fill")
                 } footer: {
                     if developerMode {
-                        Text("Test-Koordinaten für Entwicklung ohne GPS-Zugriff.")
+                        Text("Test-Koordinaten und Debug-Tools für Entwicklung.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
                 
-                // MARK: - Info
+                // MARK: - App Info
                 Section {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text("1.0.1")
                             .foregroundColor(.secondary)
                     }
                     
                     HStack {
                         Text("Build")
                         Spacer()
-                        Text("2025.01")
+                        Text("2025.01.20")
                             .foregroundColor(.secondary)
                     }
                     

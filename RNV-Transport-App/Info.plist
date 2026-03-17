@@ -22,6 +22,13 @@
         <key>RNV_APP_GROUP_ID</key>
         <string>$(RNV_APP_GROUP_ID)</string>
 
+        <key>RNV_SIGNING_KEY</key>
+        <string>$(RNV_SIGNING_KEY)</string>
+        
+        <!-- ✅ FIX: Live Activities Support -->
+        <key>NSSupportsLiveActivities</key>
+        <true/>
+
         <!-- App Transport Security -->
         <key>NSAppTransportSecurity</key>
         <dict>

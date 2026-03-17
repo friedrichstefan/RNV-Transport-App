@@ -1,5 +1,5 @@
 //
-//  ContentMediumComponents.swift
+//  LiveActivityComponents.swift
 //  RNV-Transport-App
 //
 //  Created by Friedrich, Stefan on 13.01.26.
@@ -8,103 +8,41 @@
 import SwiftUI
 import ActivityKit
 import WidgetKit
-
-// ========================================
-// MARK: - Helper: Date Calculations
-// ========================================
-
-struct DateCalculationHelper {
-    static let formatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-    
-    static func isBeforeDeparture(_ departureTimeISO: String, at currentTime: Date) -> Bool {
-        guard let departureDate = formatter.date(from: departureTimeISO) else { return false }
-        return currentTime < departureDate
-    }
-    
-    static func safeCalculateDepartureDate(from isoString: String, currentTime: Date) -> ClosedRange<Date>? {
-        guard let departureDate = formatter.date(from: isoString),
-              departureDate > currentTime else { return nil }
-        return currentTime...departureDate
-    }
-    
-    static func safeCalculateRealArrivalDate(from arrivalTimeISO: String, currentTime: Date) -> ClosedRange<Date>? {
-        guard let arrivalDate = formatter.date(from: arrivalTimeISO),
-              arrivalDate > currentTime else { return nil }
-        return currentTime...arrivalDate
-    }
-    
-    static func safeCalculateEstimatedDepartureDate(from departureTimeISO: String, delayMinutes: Int, currentTime: Date) -> ClosedRange<Date>? {
-        guard let departureDate = formatter.date(from: departureTimeISO) else { return nil }
-        let estimatedDepartureDate = departureDate.addingTimeInterval(TimeInterval(delayMinutes * 60))
-        guard estimatedDepartureDate > currentTime else { return nil }
-        return currentTime...estimatedDepartureDate
-    }
-    
-    static func safeCalculateDelayedArrivalDate(from arrivalTimeISO: String, delayMinutes: Int, currentTime: Date) -> ClosedRange<Date>? {
-        guard let arrivalDate = formatter.date(from: arrivalTimeISO) else { return nil }
-        let delayedArrivalDate = arrivalDate.addingTimeInterval(TimeInterval(delayMinutes * 60))
-        guard delayedArrivalDate > currentTime else { return nil }
-        return currentTime...delayedArrivalDate
-    }
-}
-
-// MARK: - Helper: Styles
-
-struct StyleHelper {
-    static func getColor(for serviceType: String) -> Color {
-        switch serviceType {
-        case "STRASSENBAHN": return .red
-        case "BUS": return .blue
-        case "S_BAHN": return .green
-        default: return .gray
-        }
-    }
-    
-    static func getIcon(for serviceType: String) -> String {
-        switch serviceType {
-        case "STRASSENBAHN": return "tram.fill"
-        case "BUS": return "bus.fill"
-        case "S_BAHN": return "train.side.front.car"
-        default: return "questionmark"
-        }
-    }
-    
-    static func getShortName(from serviceName: String) -> String {
-        serviceName.replacingOccurrences(of: "RNV ", with: "")
-    }
-}
+import AppIntents
 
 // MARK: - Journey Progress View
 
 struct JourneyProgressView: View {
-    let departureTimeISO: String
-    let arrivalTimeISO: String
+    let departureDate: Date
+    let arrivalDate: Date
     let serviceType: String
     let delay: Int?
     
+    private var effectiveDepartureDate: Date {
+        if let delay = delay, delay > 0 {
+            return departureDate.addingTimeInterval(TimeInterval(delay * 60))
+        }
+        return departureDate
+    }
+    
     var body: some View {
         TimelineView(.periodic(from: Date(), by: 1.0)) { context in
-            let departureDate = parseDepartureDate()
-            let arrivalDate = parseArrivalDate()
-            let currentTime = context.date
-            let isBeforeDeparture = currentTime < departureDate
-            
-            if isBeforeDeparture {
-                beforeDepartureView(currentTime: currentTime, departureDate: departureDate)
-            } else {
-                duringJourneyView(currentTime: currentTime, departureDate: departureDate, arrivalDate: arrivalDate)
-            }
+            journeyContent(currentTime: context.date)
         }
     }
     
     @ViewBuilder
-    private func beforeDepartureView(currentTime: Date, departureDate: Date) -> some View {
-        let actualDepartureDate = (delay != nil && delay! > 0) ?
-            departureDate.addingTimeInterval(TimeInterval(delay! * 60)) : departureDate
+    private func journeyContent(currentTime: Date) -> some View {
+        if currentTime < effectiveDepartureDate {
+            beforeDepartureView(currentTime: currentTime)
+        } else {
+            duringJourneyView(currentTime: currentTime)
+        }
+    }
+    
+    @ViewBuilder
+    private func beforeDepartureView(currentTime: Date) -> some View {
+        let actualDepartureDate = effectiveDepartureDate
         
         let totalTimeRemaining = max(0, actualDepartureDate.timeIntervalSince(currentTime))
         let initialTotalTime = actualDepartureDate.timeIntervalSince(Date())
@@ -138,7 +76,7 @@ struct JourneyProgressView: View {
                     Capsule().fill(Color.gray.opacity(0.3)).frame(height: 15)
                     Capsule().fill(delay != nil && delay! > 0 ? Color.red : Color.blue)
                         .frame(width: geometry.size.width * progress, height: 15)
-                        .animation(.easeInOut, value: progress)
+                        .animation(.linear(duration: 1.0), value: progress)
                 }
             }
             .frame(height: 15).clipShape(Capsule())
@@ -146,8 +84,8 @@ struct JourneyProgressView: View {
     }
     
     @ViewBuilder
-    private func duringJourneyView(currentTime: Date, departureDate: Date, arrivalDate: Date) -> some View {
-        let progress = calculateJourneyProgress(currentTime: currentTime, departureDate: departureDate, arrivalDate: arrivalDate)
+    private func duringJourneyView(currentTime: Date) -> some View {
+        let progress = calculateJourneyProgress(currentTime: currentTime)
         
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -176,17 +114,8 @@ struct JourneyProgressView: View {
         .frame(height: 30)
     }
     
-    private func parseDepartureDate() -> Date {
-        DateCalculationHelper.formatter.date(from: departureTimeISO) ?? Date()
-    }
-    
-    private func parseArrivalDate() -> Date {
-        DateCalculationHelper.formatter.date(from: arrivalTimeISO) ?? Date().addingTimeInterval(20 * 60)
-    }
-    
-    private func calculateJourneyProgress(currentTime: Date, departureDate: Date, arrivalDate: Date) -> CGFloat {
-        let actualDepartureDate = (delay != nil && delay! > 0) ?
-            departureDate.addingTimeInterval(TimeInterval(delay! * 60)) : departureDate
+    private func calculateJourneyProgress(currentTime: Date) -> CGFloat {
+        let actualDepartureDate = effectiveDepartureDate
         
         let journeyDuration = arrivalDate.timeIntervalSince(actualDepartureDate)
         let elapsedTime = currentTime.timeIntervalSince(actualDepartureDate)
@@ -220,14 +149,13 @@ struct StatusBadgeView: View {
     }
 }
 
-// MARK: - Angekommen-View
+// MARK: - Arrived View
 
 struct ArrivedView: View {
     let context: ActivityViewContext<TripLiveActivityAttributes>
     
     var body: some View {
         VStack(spacing: 16) {
-            // Header mit Icon
             VStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 48, weight: .bold))
@@ -239,7 +167,6 @@ struct ArrivedView: View {
                     .foregroundColor(.primary)
             }
             
-            // Strecken-Info
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -273,12 +200,10 @@ struct ArrivedView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 
-                // Trennlinie
                 Rectangle()
                     .fill(Color.secondary.opacity(0.2))
                     .frame(height: 0.5)
                 
-                // Hinweis
                 Text("Schließt automatisch in 1 Minute")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -310,22 +235,21 @@ struct ContentMediumView: View {
         }
     }
     
-    // ✅ GEÄNDERT: Dynamische Höhe je nach Phase
     private var regularView: some View {
         VStack(spacing: 0) {
             headerSection
             progressSection
         }
         .frame(
-            minHeight: isBeforeDeparture ? 140 : 120,  //
-            maxHeight: isBeforeDeparture ? 180 : 160   //
+            minHeight: isBeforeDeparture ? 140 : 120,
+            maxHeight: isBeforeDeparture ? 180 : 160
         )
         .background(Color(.systemBackground))
         .activityBackgroundTint(Color(.systemBackground))
         .activitySystemActionForegroundColor(Color.primary)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isBeforeDeparture)
     }
     
-    // ✅ GEÄNDERT: Mehr Padding vor Abfahrt
     private var headerSection: some View {
         VStack(spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
@@ -336,8 +260,8 @@ struct ContentMediumView: View {
             stationInfoRow
         }
         .padding(.horizontal, 14)
-        .padding(.top, isBeforeDeparture ? 16 : 24)      // ✅ Mehr Platz oben
-        .padding(.bottom, isBeforeDeparture ? 14 : 10)   // ✅ Mehr Platz unten
+        .padding(.top, isBeforeDeparture ? 16 : 24)
+        .padding(.bottom, isBeforeDeparture ? 14 : 10)
     }
     
     private var lineInfoBadge: some View {
@@ -361,7 +285,6 @@ struct ContentMediumView: View {
                 }
             } else {
                 if let delay = context.state.delay, delay > 0 {
-
                     HStack(spacing: 3) {
                         Image(systemName: "clock.badge.exclamationmark").font(.system(size: 10))
                         Text("+\(delay) min").font(.system(size: 13, weight: .bold)).lineLimit(1)
@@ -369,10 +292,6 @@ struct ContentMediumView: View {
                     .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
                     .background(Capsule().fill(Color.red))
                     .frame(width: 110, alignment: .trailing)
-                    
-                    
-                    
-                    
                 } else {
                     StatusBadgeView(icon: "arrow.right.circle.fill", text: "Unterwegs", color: .blue)
                 }
@@ -419,26 +338,22 @@ struct ContentMediumView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
     
-    
-    
-    // ✅ GEÄNDERT: Mehr Padding für Progress Section vor Abfahrt
     private var progressSection: some View {
         VStack(spacing: 6) {
             JourneyProgressView(
-                departureTimeISO: context.attributes.departureTimeISO,
-                arrivalTimeISO: context.attributes.arrivalTimeISO,
+                departureDate: DateCalculationHelper.parseDate(context.attributes.departureTimeISO) ?? Date(),
+                arrivalDate: DateCalculationHelper.parseDate(context.attributes.arrivalTimeISO) ?? Date().addingTimeInterval(20 * 60),
                 serviceType: context.state.serviceType,
                 delay: context.state.delay
             )
             .frame(height: 18)
             
-            // Footer nur während der Fahrt anzeigen
             if !isBeforeDeparture {
                 footerRow
             }
         }
         .padding(.horizontal, 14)
-        .padding(.bottom, 20)   // ✅ Mehr Platz unten
+        .padding(.bottom, 20)
     }
     
     private var footerRow: some View {
@@ -473,7 +388,6 @@ struct ContentMediumView: View {
         .background(
             RoundedRectangle(cornerRadius: 7)
                 .fill(Color.secondary.opacity(0.1))
-                .padding(.trailing, 110)
         )
     }
     
@@ -518,7 +432,334 @@ struct ContentMediumView: View {
     }
 }
 
-// MARK: - Preview Helper Extensions
+// MARK: - Dynamic Island: Expanded Leading
+
+struct DynamicIslandExpandedLeading: View {
+    let serviceType: String
+    let lineName: String
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: StyleHelper.getIcon(for: serviceType))
+                .font(.system(size: 12, weight: .medium))
+            Text(StyleHelper.getShortName(from: lineName))
+                .font(.system(size: 12, weight: .bold))
+                .lineLimit(1).minimumScaleFactor(0.8)
+        }
+        .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
+        .background(Capsule().fill(StyleHelper.getColor(for: serviceType)))
+        .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 8)
+    }
+}
+
+// MARK: - Dynamic Island: Expanded Trailing
+
+struct DynamicIslandExpandedTrailing: View {
+    let delay: Int?
+    let phase: TripPhase
+    
+    var body: some View {
+        Group {
+            if phase == .arrived {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 10))
+                    Text("Angekommen").font(.system(size: 12, weight: .medium)).lineLimit(1)
+                }
+                .foregroundColor(.white).padding(.horizontal, 8).padding(.vertical, 5)
+                .background(Capsule().fill(Color.green))
+                .frame(width: 110, alignment: .trailing)
+            } else if let delay = delay, delay > 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "clock.badge.exclamationmark").font(.system(size: 10))
+                    Text("+\(delay) min").font(.system(size: 12, weight: .bold)).lineLimit(1)
+                }
+                .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Color.red))
+                .frame(width: 110, alignment: .trailing)
+            } else {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 10))
+                    Text("Pünktlich").font(.system(size: 12, weight: .medium)).lineLimit(1)
+                }
+                .foregroundColor(.white).padding(.horizontal, 8).padding(.vertical, 5)
+                .background(Capsule().fill(Color.green))
+                .frame(width: 110, alignment: .trailing)
+            }
+        }
+        .padding(.trailing, 8)
+    }
+}
+
+// MARK: - Dynamic Island: Arrived Bottom View
+
+struct DynamicIslandArrivedBottom: View {
+    let startStation: String
+    let endStation: String
+    let tripId: String
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("VON").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
+                    Text(startStation).font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Image(systemName: "arrow.right").font(.system(size: 11))
+                    .foregroundColor(.secondary).padding(.top, 8)
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("NACH").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
+                    Text(endStation).font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(.horizontal, 12)
+            
+            if #available(iOS 16.2, *) {
+                Button(intent: EndAllActivitiesIntent()) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Beenden")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.red)
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
+            }
+        }
+        .padding(.top, 0)
+    }
+}
+
+// MARK: - Dynamic Island: Expanded Bottom
+
+struct DynamicIslandExpandedBottom: View {
+    let startStation: String
+    let endStation: String
+    let departureTimeISO: String
+    let arrivalTimeISO: String
+    let serviceType: String
+    let delay: Int?
+    let phase: TripPhase
+    let tripId: String
+    
+    var body: some View {
+        if phase == .arrived {
+            DynamicIslandArrivedBottom(
+                startStation: startStation,
+                endStation: endStation,
+                tripId: tripId
+            )
+        } else {
+            regularBottomView
+        }
+    }
+    
+    private var regularBottomView: some View {
+        VStack(spacing: 10) {
+            stationRow
+            progressBar
+        }
+        .padding(.top, 0)
+    }
+    
+    private var stationRow: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("VON").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
+                Text(startStation).font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Image(systemName: "arrow.right").font(.system(size: 11))
+                .foregroundColor(.secondary).padding(.top, 8)
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("NACH").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary)
+                Text(endStation).font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 12)
+    }
+    
+    private var progressBar: some View {
+        JourneyProgressView(
+            departureDate: DateCalculationHelper.parseDate(departureTimeISO) ?? Date(),
+            arrivalDate: DateCalculationHelper.parseDate(arrivalTimeISO) ?? Date().addingTimeInterval(20 * 60),
+            serviceType: serviceType,
+            delay: delay
+        )
+        .frame(height: 24)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 4)
+    }
+}
+
+// MARK: - Dynamic Island: Compact Leading
+
+struct DynamicIslandCompactLeading: View {
+    let serviceType: String
+    let lineName: String
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: StyleHelper.getIcon(for: serviceType)).font(.caption)
+            Text(StyleHelper.getShortName(from: lineName)).font(.caption2).fontWeight(.bold)
+        }
+        .foregroundColor(StyleHelper.getColor(for: serviceType))
+    }
+}
+
+// MARK: - Dynamic Island: Compact Trailing
+
+struct DynamicIslandCompactTrailing: View {
+    let departureTimeISO: String
+    let arrivalTimeISO: String
+    let delay: Int?
+    let phase: TripPhase
+    
+    var body: some View {
+        if phase == .arrived {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundColor(.green)
+                .frame(width: 40, alignment: .trailing)
+        } else {
+            if phase == .beforeDeparture {
+                beforeDepartureCompactTimer(currentTime: Date())
+            } else {
+                duringJourneyCompactTimer(currentTime: Date())
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func beforeDepartureCompactTimer(currentTime: Date) -> some View {
+        if let delay = delay, delay > 0 {
+            if let totalRange = DateCalculationHelper.safeCalculateEstimatedDepartureDate(
+                from: departureTimeISO, delayMinutes: delay, currentTime: currentTime
+            ) {
+                Text(timerInterval: totalRange, countsDown: true)
+                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.red).frame(width: 40, alignment: .trailing)
+            } else {
+                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.red).frame(width: 40, alignment: .trailing)
+            }
+        } else {
+            if let timeRange = DateCalculationHelper.safeCalculateDepartureDate(
+                from: departureTimeISO, currentTime: currentTime
+            ) {
+                Text(timerInterval: timeRange, countsDown: true)
+                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.green).frame(width: 40, alignment: .trailing)
+            } else {
+                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.green).frame(width: 40, alignment: .trailing)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func duringJourneyCompactTimer(currentTime: Date) -> some View {
+        if let delay = delay, delay > 0 {
+            if let totalRange = DateCalculationHelper.safeCalculateDelayedArrivalDate(
+                from: arrivalTimeISO,
+                delayMinutes: delay,
+                currentTime: currentTime
+            ) {
+                Text(timerInterval: totalRange, countsDown: true)
+                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
+            } else {
+                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
+            }
+        } else {
+            if let timeRange = DateCalculationHelper.safeCalculateRealArrivalDate(
+                from: arrivalTimeISO,
+                currentTime: currentTime
+            ) {
+                Text(timerInterval: timeRange, countsDown: true)
+                    .font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
+            } else {
+                Text("--:--").font(.caption2).fontWeight(.semibold).monospacedDigit()
+                    .foregroundColor(.blue).frame(width: 40, alignment: .trailing)
+            }
+        }
+    }
+}
+
+// MARK: - Dynamic Island: Minimal View
+
+struct DynamicIslandMinimalView: View {
+    let departureTimeISO: String
+    let serviceType: String
+    let delay: Int?
+    let phase: TripPhase
+    
+    var body: some View {
+        if phase == .arrived {
+            ZStack {
+                Circle().fill(Color.black).frame(width: 20, height: 20)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 19))
+                    .foregroundColor(.green)
+            }
+        } else {
+            let hasDelay = delay != nil && delay! > 0
+            
+            ZStack {
+                if phase == .beforeDeparture {
+                    beforeDepartureIcon(hasDelay: hasDelay)
+                } else {
+                    duringJourneyIcon(hasDelay: hasDelay)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func beforeDepartureIcon(hasDelay: Bool) -> some View {
+        if hasDelay {
+            Circle().fill(Color.black).frame(width: 20, height: 20)
+            Image(systemName: "clock.fill").font(.system(size: 19)).foregroundColor(.red)
+        } else {
+            Circle().fill(Color.black).frame(width: 20, height: 20)
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 19)).foregroundColor(.green)
+        }
+    }
+    
+    @ViewBuilder
+    private func duringJourneyIcon(hasDelay: Bool) -> some View {
+        if hasDelay {
+            Circle().fill(Color.black).frame(width: 25, height: 20)
+            Image(systemName: StyleHelper.getIcon(for: serviceType)).font(.caption).foregroundColor(.red)
+        } else {
+            Circle().fill(Color.black).frame(width: 25, height: 20)
+            Image(systemName: StyleHelper.getIcon(for: serviceType)).font(.caption).foregroundColor(.blue)
+        }
+    }
+}
+
+// MARK: - Preview Helpers
 
 extension TripLiveActivityAttributes {
     static var previewBeforeDeparture: TripLiveActivityAttributes {

@@ -9,7 +9,7 @@ import Foundation
 import AppIntents
 import ActivityKit
 
-@available(iOS 16.0, *)
+@available(iOS 16.2, *)
 struct EndAllActivitiesIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Alle Live Activities beenden"
     static var description: IntentDescription = IntentDescription("Beendet alle aktiven Verbindungs-Verfolgungen")
@@ -20,13 +20,10 @@ struct EndAllActivitiesIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         print("🛑 [INTENT] EndAllActivitiesIntent aufgerufen")
         
-        // Alle Trip-IDs aus UserDefaults holen
         let activeTrips = LiveActivityState.shared.getAllActiveTrips()
         
-        // Alle Trips deaktivieren
         LiveActivityState.shared.deactivateAllTrips()
         
-        // Alle Activities beenden
         let activities = Activity<TripLiveActivityAttributes>.activities
         
         for activity in activities {

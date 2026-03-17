@@ -10,14 +10,16 @@ import CoreLocation
 
 struct ContentView: View {
     @StateObject private var authService = AuthService()
-    @StateObject private var graphQLService = SecureGraphQLService() // ✅ Sicherer Service
+    @StateObject private var graphQLService = SecureGraphQLService()
     @StateObject private var locationManager = LocationManager()
-    
+
     @State private var activeTripCount = 0
-    
+    @State private var refreshTask: Task<Void, Never>?
+    @State private var cleanupTask: Task<Void, Never>?
+
     var body: some View {
         TabView {
-            // MARK: - Verbindungen Tab
+            // MARK: - Connections Tab
             ConnectionsView(
                 authService: authService,
                 graphQLService: graphQLService,
@@ -26,90 +28,68 @@ struct ContentView: View {
             .tabItem {
                 Label("Verbindungen", systemImage: "tram.fill")
             }
-            
-            // MARK: - Geplante Fahrten Tab
+
+            // MARK: - Planned Trips Tab
             PlannedTripsView()
                 .tabItem {
                     Label("Geplante Fahrten", systemImage: activeTripCount > 0 ? "bell.badge.fill" : "bell.badge")
                 }
-            
-            // MARK: - Einstellungen Tab
+
+            // MARK: - Settings Tab
             SettingsView(locationManager: locationManager)
                 .tabItem {
                     Label("Einstellungen", systemImage: "gearshape.fill")
                 }
         }
         .onAppear {
-            // ✅ xcconfig Validierung
+            #if DEBUG
             print("🔍 [xcconfig] CLIENT_ID: \(Bundle.main.object(forInfoDictionaryKey: "RNV_CLIENT_ID") ?? "❌ NIL")")
             print("🔍 [xcconfig] GRAPHQL_URL: \(Bundle.main.object(forInfoDictionaryKey: "RNV_GRAPHQL_URL") ?? "❌ NIL")")
-            
-            updateActiveTripCount()
-            
-            // Certificate Pinning Setup (nur beim ersten Start)
-            #if DEBUG
-            graphQLService.setupCertificatePinning()
             #endif
-            
-            Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
-                updateActiveTripCount()
-            }
+
+            // Certificate Pinning muss auch im Release-Build eingerichtet werden
+            graphQLService.setupCertificatePinning()
+
+            startPeriodicRefresh()
+            startDailyCleanup()
+        }
+        .onDisappear {
+            refreshTask?.cancel()
+            cleanupTask?.cancel()
         }
         .task {
             await authService.autoAuthenticate()
             await locationManager.autoRequestLocation()
         }
     }
-    
-    private func updateActiveTripCount() {
-        activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
-    }
-    
-    private func validateConfiguration() {
-        #if DEBUG
-        print("🔍 [SECURITY] Starte Konfigurationsvalidierung...")
-        
-        let requiredKeys = [
-            "RNV_CLIENT_ID",
-            "RNV_CLIENT_SECRET",
-            "RNV_TENANT_ID",
-            "RNV_RESOURCE",
-            "RNV_GRAPHQL_URL"
-        ]
-        
-        var missingKeys: [String] = []
-        
-        for key in requiredKeys {
-            if let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-               !value.isEmpty {
-                print("✅ [CONFIG] \(key): Konfiguriert")
-            } else {
-                print("❌ [CONFIG] \(key): FEHLT!")
-                missingKeys.append(key)
+
+    // MARK: - Periodic Refresh using structured concurrency
+
+    private func startPeriodicRefresh() {
+        refreshTask?.cancel()
+        refreshTask = Task {
+            while !Task.isCancelled {
+                activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
+                try? await Task.sleep(for: .seconds(5))
             }
         }
-        
-        if !missingKeys.isEmpty {
-            let errorMessage = """
-            🚨 CONFIGURATION FEHLER:
-            
-            Folgende Keys sind nicht konfiguriert:
-            \(missingKeys.joined(separator: "\n"))
-            
-            Lösung:
-            1. Erstelle Config.xcconfig aus Template.xcconfig
-            2. Fülle alle RNV Credentials aus
-            3. Baue die App neu
-            """
-            
-            print(errorMessage)
-            assertionFailure("Konfiguration unvollständig!")
-        } else {
-            print("✅ [SECURITY] Alle Konfigurationen sind vollständig")
-        }
-        #endif
     }
-    
+
+    private func startDailyCleanup() {
+        cleanupTask?.cancel()
+        cleanupTask = Task {
+            // Sofort beim App-Start abgelaufene Trips entfernen
+            TripDataManager.shared.removeExpiredTrips()
+            print("✅ [CLEANUP] Initiales Cleanup beim App-Start abgeschlossen")
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(86400))
+                guard !Task.isCancelled else { break }
+                TripDataManager.shared.removeExpiredTrips()
+                print("✅ [CLEANUP] Tägliches Cleanup abgeschlossen")
+            }
+        }
+    }
 }
 
 #Preview {
