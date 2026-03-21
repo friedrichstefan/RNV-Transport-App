@@ -10,7 +10,7 @@ import CoreLocation
 
 struct SettingsView: View {
     @ObservedObject var locationManager: LocationManager
-    @StateObject private var liveActivityManager = LiveActivityManager()
+    @EnvironmentObject var liveActivityManager: LiveActivityManager
 
     @AppStorage("autoStartLiveActivity") private var autoStartLiveActivity = false
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
@@ -251,7 +251,7 @@ struct SettingsView: View {
                             LiveActivityState.shared.debugPrintState()
                         }) {
                             HStack {
-                                Image(systemName: "bug.fill")
+                                Image(systemName: "ant.fill")
                                     .foregroundColor(.red)
                                 Text("Debug: State ausdrucken")
                                     .foregroundColor(.primary)
@@ -334,14 +334,19 @@ struct SettingsView: View {
 
     private func cleanupAllActivities() async {
         if #available(iOS 16.2, *) {
+            #if DEBUG
             print("🗑️ [SETTINGS] Starte komplettes Cleanup...")
+            #endif
             await liveActivityManager.endAllActivitiesAndResetToggles()
             LiveActivityState.shared.deactivateAllTrips()
+            #if DEBUG
             print("✅ [SETTINGS] Cleanup abgeschlossen")
+            #endif
         }
     }
 }
 
 #Preview {
     SettingsView(locationManager: LocationManager())
+        .environmentObject(LiveActivityManager())
 }

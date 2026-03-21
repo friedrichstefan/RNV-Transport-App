@@ -78,22 +78,50 @@ struct DateCalculationHelper {
 // MARK: - Style Helper
 
 struct StyleHelper {
-    static func getColor(for serviceType: String) -> Color {
-        switch serviceType {
-        case "STRASSENBAHN": return .red
-        case "BUS": return .blue
-        case "S_BAHN": return .green
-        default: return .gray
-        }
+    // MARK: - Linientyp-Erkennung (serviceType + serviceName Fallback)
+
+    private static func isSBahn(type: String, name: String) -> Bool {
+        if type.contains("S_BAHN") || type.contains("SBAHN") || type.contains("SUBURBAN") { return true }
+        if name.count >= 2, name.hasPrefix("S"), name.dropFirst().first?.isNumber == true { return true }
+        return false
     }
 
-    static func getIcon(for serviceType: String) -> String {
-        switch serviceType {
-        case "STRASSENBAHN": return "tram.fill"
-        case "BUS": return "bus.fill"
-        case "S_BAHN": return "train.side.front.car"
-        default: return "questionmark"
-        }
+    private static func isLongDistance(type: String, name: String) -> Bool {
+        if type.contains("ICE") || type.contains("INTERCITY") || type.contains("FERNVERKEHR") || type.contains("HOCHGESCHWINDIGKEIT") { return true }
+        if name.hasPrefix("ICE") || name.hasPrefix("IC") || name.hasPrefix("EC") || name.hasPrefix("TGV") || name.hasPrefix("RJX") || name.hasPrefix("FLX") { return true }
+        return false
+    }
+
+    private static func isRegional(type: String, name: String) -> Bool {
+        if type.contains("REGIONAL") || type.contains("_RE") || type.contains("RB") || type.contains("MEX") { return true }
+        if name.count >= 3, (name.hasPrefix("RE") || name.hasPrefix("RB") || name.hasPrefix("MEX")), name.dropFirst(2).first?.isNumber == true { return true }
+        // MEX-Sonderfall: Präfix ist 3 Zeichen lang
+        if name.count >= 4, name.hasPrefix("MEX"), name.dropFirst(3).first?.isNumber == true { return true }
+        return false
+    }
+
+    static func getColor(for serviceType: String, serviceName: String = "") -> Color {
+        let type = serviceType.uppercased()
+        let name = serviceName.trimmingCharacters(in: .whitespaces).uppercased()
+
+        if isSBahn(type: type, name: name) { return .green }
+        if isLongDistance(type: type, name: name) { return Color(red: 0.55, green: 0.0, blue: 0.05) }
+        if isRegional(type: type, name: name) { return Color(red: 0.4, green: 0.1, blue: 0.6) }
+        if type.contains("STRASSENBAHN") || type.contains("TRAM") { return .red }
+        if type.contains("BUS") { return .blue }
+        return .gray
+    }
+
+    static func getIcon(for serviceType: String, serviceName: String = "") -> String {
+        let type = serviceType.uppercased()
+        let name = serviceName.trimmingCharacters(in: .whitespaces).uppercased()
+
+        if isSBahn(type: type, name: name) { return "s.circle.fill" }
+        if isLongDistance(type: type, name: name) { return "train.side.front.car" }
+        if isRegional(type: type, name: name) { return "tram.fill" }
+        if type.contains("STRASSENBAHN") || type.contains("TRAM") { return "lightrail.fill" }
+        if type.contains("BUS") { return "bus.fill" }
+        return "questionmark"
     }
 
     static func getShortName(from serviceName: String) -> String {

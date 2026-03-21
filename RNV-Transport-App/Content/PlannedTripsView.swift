@@ -8,9 +8,8 @@
 import SwiftUI
 
 struct PlannedTripsView: View {
-    @StateObject private var liveActivityManager = LiveActivityManager()
+    @EnvironmentObject var liveActivityManager: LiveActivityManager
     @State private var activeTrips: [String] = []
-    @State private var refreshTask: Task<Void, Never>?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -50,11 +49,9 @@ struct PlannedTripsView: View {
         .onAppear {
             refreshActiveTrips()
             TripDataManager.shared.removeExpiredTrips()
-            startRefreshTask()
         }
-        .onDisappear {
-            refreshTask?.cancel()
-            refreshTask = nil
+        .onReceive(NotificationCenter.default.publisher(for: LiveActivityState.activeTripsDidChangeNotification)) { _ in
+            refreshActiveTrips()
         }
     }
 
@@ -107,7 +104,9 @@ struct PlannedTripsView: View {
 
     private func refreshActiveTrips() {
         activeTrips = LiveActivityState.shared.getAllActiveTrips()
+        #if DEBUG
         print("🔄 [REFRESH] \(activeTrips.count) aktive Trips gefunden")
+        #endif
     }
 
     private func removeTrip(_ tripId: String) {
@@ -123,18 +122,9 @@ struct PlannedTripsView: View {
             activeTrips.removeAll()
         }
     }
-
-    private func startRefreshTask() {
-        refreshTask?.cancel()
-        refreshTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
-                refreshActiveTrips()
-            }
-        }
-    }
 }
 
 #Preview {
     PlannedTripsView()
+        .environmentObject(LiveActivityManager())
 }

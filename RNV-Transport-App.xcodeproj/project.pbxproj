@@ -7,10 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		39111F8E2F1C6108002FB482 /* Debug.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8D2F1C6108002FB482 /* Debug.xcconfig */; };
 		39111F902F1C61A0002FB482 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8F2F1C61A0002FB482 /* .gitignore */; };
-		39111F9E2F1C6A1E002FB482 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 39111F9D2F1C6A1E002FB482 /* Secrets.xcconfig */; };
-		39111FA22F1C7046002FB482 /* Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 39111FA12F1C7046002FB482 /* Release.xcconfig */; };
 		395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FE92F11B3F700BC7030 /* Apollo */; };
 		395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FEB2F11B3F700BC7030 /* ApolloAPI */; };
 		395F20AA2F128DB500BC7030 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20A92F128DB500BC7030 /* WidgetKit.framework */; };
@@ -214,7 +211,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
-				LastUpgradeCheck = 2620;
+				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					395F1FD42F11B2B100BC7030 = {
 						CreatedOnToolsVersion = 26.2;
@@ -253,9 +250,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				39111F902F1C61A0002FB482 /* .gitignore in Resources */,
-				39111F9E2F1C6A1E002FB482 /* Secrets.xcconfig in Resources */,
-				39111F8E2F1C6108002FB482 /* Debug.xcconfig in Resources */,
-				39111FA22F1C7046002FB482 /* Release.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -356,6 +350,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				RNV_GRAPHQL_URL = "https://graphql-sandbox-dds.rnv-online.de";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -415,6 +410,7 @@
 				MTL_FAST_MATH = YES;
 				RNV_GRAPHQL_URL = "https://graphql-sandbox-dds.rnv-online.de";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -430,7 +426,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = A4HCRKN53K;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RNV-Transport-App/Info.plist";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Wir benötigen deinen Standort für Live-Updates während deiner Fahrt.";
@@ -474,7 +472,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = A4HCRKN53K;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RNV-Transport-App/Info.plist";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Wir benötigen deinen Standort für Live-Updates während deiner Fahrt.";

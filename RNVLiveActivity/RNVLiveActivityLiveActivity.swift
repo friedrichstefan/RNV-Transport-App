@@ -52,6 +52,7 @@ struct RNVLiveActivityLiveActivity: Widget {
                         departureTimeISO: context.attributes.departureTimeISO,
                         arrivalTimeISO: context.attributes.arrivalTimeISO,
                         serviceType: context.state.serviceType,
+                        lineName: context.state.lineName,
                         delay: context.state.delay,
                         phase: context.state.phase,
                         tripId: context.attributes.tripId,
@@ -84,11 +85,12 @@ struct RNVLiveActivityLiveActivity: Widget {
                 DynamicIslandMinimalView(
                     departureTimeISO: context.attributes.departureTimeISO,
                     serviceType: context.state.serviceType,
+                    lineName: context.state.lineName,
                     delay: context.state.delay,
                     phase: context.state.phase
                 )
             }
-            .keylineTint(StyleHelper.getColor(for: context.state.serviceType))
+            .keylineTint(StyleHelper.getColor(for: context.state.serviceType, serviceName: context.state.lineName))
         }
     }
 }

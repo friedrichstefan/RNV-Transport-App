@@ -14,6 +14,8 @@ struct TripDetailView: View {
 
     @ObservedObject var liveActivityManager: LiveActivityManager
     @State private var isLiveActivityActive = false
+    @State private var didAppear = false
+    @State private var showShareSheet = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -30,13 +32,16 @@ struct TripDetailView: View {
                         liveActivityDetailSection
                     }
 
-                    VStack(spacing: 16) {
-                        ForEach(Array(trip.legs.enumerated()), id: \.offset) { index, leg in
-                            LegDetailCard(leg: leg, isLast: index == trip.legs.count - 1)
-                        }
+                    // Route-Zusammenfassung
+                    if trip.legs.filter({ $0.isTimedLeg }).count > 1 {
+                        TripRouteSummary(legs: trip.legs)
+                            .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 30)
+
+                    // Zusammenhängende Reise-Timeline
+                    TripJourneyView(legs: trip.legs)
+                        .padding(.horizontal)
+                        .padding(.bottom, 30)
                 }
             }
             .background(Color(colorScheme == .dark ? .black : .systemGroupedBackground))
@@ -44,10 +49,17 @@ struct TripDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                            .font(.title3)
+                    HStack(spacing: 12) {
+                        Button(action: { showShareSheet = true }) {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundColor(AppTheme.primaryColor)
+                                .font(.title3)
+                        }
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.title3)
+                        }
                     }
                 }
 
@@ -62,31 +74,69 @@ struct TripDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showShareSheet) {
+            let text = generateShareText()
+            ShareSheet(activityItems: [text])
+        }
         .onAppear {
             if #available(iOS 16.2, *) {
                 isLiveActivityActive = LiveActivityState.shared.isTripActive(trip.id.uuidString)
             }
+            didAppear = true
         }
     }
 
     // MARK: - Trip Overview Header
 
     private var tripOverviewHeader: some View {
-        VStack(spacing: 16) {
+        let depDelay = getFirstLegDelay()
+        let arrDelay = getLastLegDelay()
+        let maxDelay = max(depDelay ?? 0, arrDelay ?? 0)
+
+        return VStack(spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        Text(formatter.formatTime(trip.startTime))
-                            .font(.system(size: 36, weight: .bold))
+                        // Departure time with delay
+                        if let delay = depDelay, delay > 0,
+                           let estDep = trip.legs.first(where: { $0.isTimedLeg })?.estimatedDepartureTime {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(formatter.formatTime(trip.startTime))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .strikethrough(true, color: .red.opacity(0.6))
+                                Text(formatter.formatTime(estDep))
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(.red)
+                            }
+                        } else {
+                            Text(formatter.formatTime(trip.startTime))
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
 
                         Image(systemName: "arrow.right")
                             .font(.title3)
                             .foregroundColor(.secondary)
 
-                        Text(formatter.formatTime(trip.endTime))
-                            .font(.system(size: 36, weight: .bold))
+                        // Arrival time with delay
+                        if let delay = arrDelay, delay > 0,
+                           let estArr = trip.legs.last(where: { $0.isTimedLeg })?.estimatedArrivalTime {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(formatter.formatTime(trip.endTime))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .strikethrough(true, color: .red.opacity(0.6))
+                                Text(formatter.formatTime(estArr))
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(.red)
+                            }
+                        } else {
+                            Text(formatter.formatTime(trip.endTime))
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
                     }
-                    .foregroundColor(.primary)
 
                     Text("Fahrtdauer: \(formatter.calculateDuration(start: trip.startTime, end: trip.endTime))")
                         .font(.headline)
@@ -96,16 +146,42 @@ struct TripDetailView: View {
                 Spacer()
             }
 
+            // Delay banner
+            if maxDelay >= 2 {
+                HStack(spacing: 8) {
+                    Image(systemName: maxDelay >= 5 ? "exclamationmark.triangle.fill" : "clock.badge.exclamationmark")
+                        .foregroundColor(maxDelay >= 5 ? .red : .orange)
+                        .font(.system(size: 14))
+
+                    Text("Verspätung: +\(maxDelay) Min.")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(maxDelay >= 5 ? .red : .orange)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill((maxDelay >= 5 ? Color.red : Color.orange).opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke((maxDelay >= 5 ? Color.red : Color.orange).opacity(0.2), lineWidth: 1)
+                        )
+                )
+            }
+
             if trip.interchanges > 0 {
-                HStack {
+                HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.swap")
                     Text("\(trip.interchanges) Umstieg\(trip.interchanges == 1 ? "" : "e")")
                 }
                 .font(.subheadline)
-                .foregroundColor(.orange)
+                .foregroundColor(.secondary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Capsule().fill(Color.orange.opacity(0.15)))
+                .background(Capsule().fill(Color(.systemGray5)))
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -201,7 +277,7 @@ struct TripDetailView: View {
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 6, y: 3)
         )
         .padding(.horizontal)
-        .onChange(of: isLiveActivityActive) { newValue in
+        .onChange(of: isLiveActivityActive) { _, newValue in
             handleToggleChange(newValue)
         }
     }
@@ -213,16 +289,67 @@ struct TripDetailView: View {
         isLiveActivityActive.toggle()
     }
 
+    // MARK: - Delay Helpers
+
+    private func getFirstLegDelay() -> Int? {
+        guard let firstTimedLeg = trip.legs.first(where: { $0.isTimedLeg }),
+              let scheduled = firstTimedLeg.departureTime,
+              let estimated = firstTimedLeg.estimatedDepartureTime else { return nil }
+        return formatter.calculateDelay(timetabled: scheduled, estimated: estimated)
+    }
+
+    private func getLastLegDelay() -> Int? {
+        guard let lastTimedLeg = trip.legs.last(where: { $0.isTimedLeg }),
+              let scheduled = lastTimedLeg.arrivalTime,
+              let estimated = lastTimedLeg.estimatedArrivalTime else { return nil }
+        return formatter.calculateDelay(timetabled: scheduled, estimated: estimated)
+    }
+
+    // MARK: - Share Text Generation
+
+    private func generateShareText() -> String {
+        var text = "🚆 RNV Verbindung\n"
+        text += "\(formatter.formatTime(trip.startTime)) → \(formatter.formatTime(trip.endTime))"
+        text += " (\(formatter.calculateDuration(start: trip.startTime, end: trip.endTime)))\n\n"
+
+        for leg in trip.legs {
+            if leg.isTimedLeg {
+                let name = leg.serviceName ?? "Unbekannt"
+                let from = leg.boardStopName ?? "?"
+                let to = leg.alightStopName ?? "?"
+                let depTime = formatter.formatTime(leg.departureTime ?? "")
+                let arrTime = formatter.formatTime(leg.arrivalTime ?? "")
+                text += "🚏 \(depTime) \(from)\n"
+                text += "   \(name) → \(leg.destinationLabel ?? "")\n"
+                text += "🚏 \(arrTime) \(to)\n\n"
+            } else {
+                let duration = formatter.calculateDuration(start: leg.departureTime ?? "", end: leg.arrivalTime ?? "")
+                text += "🚶 Fußweg (\(duration))\n\n"
+            }
+        }
+
+        if trip.interchanges > 0 {
+            text += "🔄 \(trip.interchanges) Umstieg\(trip.interchanges == 1 ? "" : "e")\n"
+        }
+
+        return text
+    }
+
     @available(iOS 16.2, *)
     private func handleToggleChange(_ newValue: Bool) {
+        guard didAppear else { return }
         Task {
             if newValue {
+                #if DEBUG
                 print("🟢 [DETAIL] Live Activity aktiviert für Trip: \(trip.id)")
+                #endif
                 LiveActivityState.shared.setTripActive(trip.id.uuidString, isActive: true)
                 TripDataManager.shared.saveTripData(trip)
                 await liveActivityManager.startActivity(for: trip, accessToken: authService.accessToken ?? "")
             } else {
+                #if DEBUG
                 print("🔴 [DETAIL] Live Activity deaktiviert für Trip: \(trip.id)")
+                #endif
                 LiveActivityState.shared.setTripActive(trip.id.uuidString, isActive: false)
                 TripDataManager.shared.removeTripData(for: trip.id.uuidString)
                 await liveActivityManager.endActivity(tripId: trip.id.uuidString)

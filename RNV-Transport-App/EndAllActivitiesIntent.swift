@@ -18,20 +18,27 @@ struct EndAllActivitiesIntent: LiveActivityIntent {
     
     @MainActor
     func perform() async throws -> some IntentResult {
+        #if DEBUG
         print("🛑 [INTENT] EndAllActivitiesIntent aufgerufen")
+        #endif
         
         let activeTrips = LiveActivityState.shared.getAllActiveTrips()
         
         LiveActivityState.shared.deactivateAllTrips()
+        LiveActivityState.shared.removeAllTripDataForWidget()
         
         let activities = Activity<TripLiveActivityAttributes>.activities
         
         for activity in activities {
+            #if DEBUG
             print("✅ [INTENT] Beende Activity: \(activity.id)")
+            #endif
             await activity.end(nil, dismissalPolicy: .immediate)
         }
         
+        #if DEBUG
         print("✅ [INTENT] Alle \(activeTrips.count) Activities beendet")
+        #endif
         
         return .result()
     }

@@ -15,7 +15,7 @@ struct PlannedTripCard: View {
     @State private var isExpanded = false
     @State private var tripData: DetailedTrip?
 
-    @StateObject private var liveActivityManager = LiveActivityManager()
+    @EnvironmentObject var liveActivityManager: LiveActivityManager
     @Environment(\.colorScheme) private var colorScheme
 
     private let formatter = DateFormattingHelper.shared
@@ -90,6 +90,37 @@ struct PlannedTripCard: View {
         }
     }
 
+    // MARK: - Line Badge Helper
+
+    @ViewBuilder
+    private func lineBadge(serviceType: String?, serviceName: String?, fontSize: Font, iconFontSize: Font, horizontalPadding: CGFloat, verticalPadding: CGFloat, strokeWidth: CGFloat) -> some View {
+        let isSBahn = TransportIconHelper.isSBahnLine(serviceType: serviceType, serviceName: serviceName)
+        let displayName = TransportIconHelper.getShortLineName(from: serviceName)
+
+        HStack(spacing: fontSize == .caption ? 4 : 2) {
+            Image(systemName: TransportIconHelper.getTransportIcon(for: serviceType, serviceName: serviceName))
+                .font(isSBahn ? .subheadline : iconFontSize)
+            Text(displayName)
+                .font(fontSize)
+                .fontWeight(.bold)
+        }
+        .foregroundColor(isSBahn ? .green : .white)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
+        .background(
+            Group {
+                if isSBahn {
+                    Capsule()
+                        .fill(Color.white)
+                        .overlay(Capsule().stroke(Color.green, lineWidth: strokeWidth))
+                } else {
+                    Capsule()
+                        .fill(TransportIconHelper.getLineColor(for: serviceType, serviceName: serviceName))
+                }
+            }
+        )
+    }
+
     // MARK: - Trip Connection Info
 
     @ViewBuilder
@@ -114,17 +145,15 @@ struct PlannedTripCard: View {
                let destination = firstTimedLeg.destinationLabel {
 
                 HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: TransportIconHelper.getTransportIcon(for: firstTimedLeg.serviceType))
-                            .font(.caption2)
-                        Text(TransportIconHelper.getShortLineName(from: serviceName))
-                            .font(.caption)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(TransportIconHelper.getLineColor(for: firstTimedLeg.serviceType)))
+                    lineBadge(
+                        serviceType: firstTimedLeg.serviceType,
+                        serviceName: firstTimedLeg.serviceName,
+                        fontSize: .caption,
+                        iconFontSize: .caption2,
+                        horizontalPadding: 8,
+                        verticalPadding: 4,
+                        strokeWidth: 1.5
+                    )
 
                     Text("→ \(destination)")
                         .font(.caption)
@@ -190,18 +219,17 @@ struct PlannedTripCard: View {
                         .foregroundColor(.secondary)
 
                     HStack(spacing: 6) {
-                        ForEach(trip.legs.filter { $0.isTimedLeg }) { leg in
-                            if let serviceName = leg.serviceName {
-                                HStack(spacing: 2) {
-                                    Image(systemName: TransportIconHelper.getTransportIcon(for: leg.serviceType))
-                                        .font(.system(size: 8))
-                                    Text(TransportIconHelper.getShortLineName(from: serviceName))
-                                        .font(.system(size: 8, weight: .bold))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(TransportIconHelper.getLineColor(for: leg.serviceType)))
+                        ForEach(trip.legs.filter { $0.isTimedLeg }, id: \.id) { leg in
+                            if leg.serviceName != nil {
+                                lineBadge(
+                                    serviceType: leg.serviceType,
+                                    serviceName: leg.serviceName,
+                                    fontSize: .system(size: 8, weight: .bold),
+                                    iconFontSize: .system(size: 8),
+                                    horizontalPadding: 4,
+                                    verticalPadding: 2,
+                                    strokeWidth: 1
+                                )
                             }
                         }
                     }
@@ -237,12 +265,16 @@ struct PlannedTripCard: View {
                     )
                 }
             )
+            #if DEBUG
             print("✅ [PLANNED] Trip-Daten geladen für: \(String(tripId.prefix(8)))")
+            #endif
         }
     }
 
     private func handleRemove() async {
+        #if DEBUG
         print("🛑 [PLANNED] Beende Live Activity für Trip: \(String(tripId.prefix(8)))")
+        #endif
 
         await liveActivityManager.endActivity(tripId: tripId)
         LiveActivityState.shared.setTripActive(tripId, isActive: false)
@@ -250,6 +282,8 @@ struct PlannedTripCard: View {
 
         onRemove()
 
+        #if DEBUG
         print("✅ [PLANNED] Komplett bereinigt: Live Activity, State und Daten")
+        #endif
     }
 }

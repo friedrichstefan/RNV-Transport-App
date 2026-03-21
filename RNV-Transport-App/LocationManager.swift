@@ -35,9 +35,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func startLocationUpdates() {
-        DispatchQueue.main.async {
-            self.isLocating = true
-        }
+        // Synchron setzen – wird immer vom Main-Thread aufgerufen
+        // (entweder direkt oder via DispatchQueue.main.async in locationManagerDidChangeAuthorization)
+        isLocating = true
         locationManager.startUpdatingLocation()
     }
     
@@ -49,7 +49,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         DispatchQueue.main.async {
             self.location = location.coordinate
             self.isLocating = false
+            #if DEBUG
             print("📍 [LOCATION] Standort aktualisiert: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+            #endif
         }
         
         locationManager.stopUpdatingLocation()
@@ -67,7 +69,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        #if DEBUG
         print("❌ [LOCATION] Fehler: \(error.localizedDescription)")
+        #endif
         DispatchQueue.main.async {
             self.isLocating = false
         }

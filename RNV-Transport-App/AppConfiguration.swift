@@ -33,11 +33,11 @@ struct AppConfiguration {
     static func validateConfiguration() -> [String] {
         var errors: [String] = []
         
-        #if DEBUG
         if teamID == "YOUR_TEAM_ID" {
-            errors.append("⚠️ teamID nicht konfiguriert - App Group wird nicht funktionieren")
+            let msg = "⚠️ teamID nicht konfiguriert - App Group wird nicht funktionieren"
+            errors.append(msg)
+            print("[AppConfiguration] WARNING: \(msg)")
         }
-        #endif
         
         return errors
     }

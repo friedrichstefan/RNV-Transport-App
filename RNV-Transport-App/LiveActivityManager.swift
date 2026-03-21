@@ -12,6 +12,7 @@ import BackgroundTasks
 import UIKit
 
 @available(iOS 16.2, *)
+@MainActor
 class LiveActivityManager: ObservableObject {
     // MARK: - Published Properties
     
@@ -25,6 +26,7 @@ class LiveActivityManager: ObservableObject {
     private var graphQLService: GraphQLService?
     private var accessToken: String = ""
     private let formatter = DateFormattingHelper.shared
+    private var notificationObservers: [Any] = []
 
     /// BGTask Identifier – muss auch in Info.plist unter BGTaskSchedulerPermittedIdentifiers stehen
     static let backgroundTaskIdentifier = "com.stefanfriedrich.rnvapp.liveactivity.refresh"
@@ -33,33 +35,38 @@ class LiveActivityManager: ObservableObject {
 
     /// Wrapper that resolves `LiveActivityState` at the call‑site so that the
     /// compiler never has to look it up at the top level of this file.
-    private static var activityState: LiveActivityState { LiveActivityState.shared }
+    nonisolated private static var activityState: LiveActivityState { LiveActivityState.shared }
     
     // MARK: - Initialization
     
     init(graphQLService: GraphQLService? = nil) {
         self.graphQLService = graphQLService
+        #if DEBUG
         print("📱 [INIT] LiveActivityManager initialisiert")
+        #endif
 
-        // Auf App-Lifecycle-Events hören für Hintergrund-Updates
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appDidEnterBackground),
-            name: UIApplication.didEnterBackgroundNotification,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appWillEnterForeground),
-            name: UIApplication.willEnterForegroundNotification,
-            object: nil
-        )
+        // Auf App-Lifecycle-Events hören für Hintergrund-Updates (Token-Pattern für sicheres deinit)
+        let bgObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleDidEnterBackground()
+        }
+        let fgObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleWillEnterForeground()
+        }
+        notificationObservers = [bgObserver, fgObserver]
     }
 
     // MARK: - Background Task Registration
 
     /// Muss einmal beim App-Start aufgerufen werden (z.B. in AppDelegate oder @main)
-    static func registerBackgroundTask() {
+    nonisolated static func registerBackgroundTask() {
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: backgroundTaskIdentifier,
             using: nil
@@ -67,11 +74,15 @@ class LiveActivityManager: ObservableObject {
             guard let bgTask = task as? BGAppRefreshTask else { return }
             handleBackgroundTask(bgTask)
         }
+        #if DEBUG
         print("✅ [BG] Background Task registriert: \(backgroundTaskIdentifier)")
+        #endif
     }
 
-    private static func handleBackgroundTask(_ task: BGAppRefreshTask) {
+    nonisolated private static func handleBackgroundTask(_ task: BGAppRefreshTask) {
+        #if DEBUG
         print("🔄 [BG] Background Task ausgeführt")
+        #endif
 
         // Nächsten Background Task planen
         scheduleBackgroundTask()
@@ -87,21 +98,25 @@ class LiveActivityManager: ObservableObject {
         }
     }
 
-    static func scheduleBackgroundTask() {
+    nonisolated static func scheduleBackgroundTask() {
         let request = BGAppRefreshTaskRequest(identifier: backgroundTaskIdentifier)
         // Frühester Zeitpunkt: in 15 Minuten (iOS-Minimum)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
 
         do {
             try BGTaskScheduler.shared.submit(request)
+            #if DEBUG
             print("⏰ [BG] Background Task geplant für ~15 Minuten")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ [BG] Konnte Background Task nicht planen: \(error)")
+            #endif
         }
     }
 
     /// Führt Phase-Updates für alle aktiven Activities im Hintergrund durch
-    private static func performBackgroundUpdate() async {
+    nonisolated private static func performBackgroundUpdate() async {
         let activeTrips = activityState.getAllActiveTrips()
         guard !activeTrips.isEmpty else { return }
 
@@ -141,7 +156,9 @@ class LiveActivityManager: ObservableObject {
                 await activity.update(
                     ActivityContent(state: newState, staleDate: staleDate)
                 )
+                #if DEBUG
                 print("✅ [BG] Activity aktualisiert: Phase → \(newPhase)")
+                #endif
             }
 
             // Beende Activity wenn angekommen
@@ -151,7 +168,10 @@ class LiveActivityManager: ObservableObject {
                    now.timeIntervalSince(arrivalDate) > 300 {
                     await activity.end(nil, dismissalPolicy: .immediate)
                     activityState.setTripActive(attrs.tripId, isActive: false)
+                    activityState.removeTripDataForWidget(tripId: attrs.tripId)
+                    #if DEBUG
                     print("🛑 [BG] Activity beendet (angekommen)")
+                    #endif
                 }
             }
         }
@@ -160,66 +180,90 @@ class LiveActivityManager: ObservableObject {
     // MARK: - Live Activity starten
     
     func startActivity(for trip: DetailedTrip, accessToken: String) async {
+        #if DEBUG
         print("🔍 [DEBUG] startActivity aufgerufen für Trip: \(trip.id)")
+        #endif
         self.accessToken = accessToken
         
         await endAllActivities()
         
         let authInfo = ActivityAuthorizationInfo()
+        #if DEBUG
         print("🔍 [DEBUG] Activity Authorization Status: \(authInfo.areActivitiesEnabled)")
+        #endif
         
         guard authInfo.areActivitiesEnabled else {
             let error = "Live Activities sind in den Einstellungen deaktiviert"
+            #if DEBUG
             print("⚠️ [WARNING] \(error)")
-            await MainActor.run {
-                self.lastError = error
-            }
+            #endif
+            self.lastError = error
             return
         }
         
         guard let firstTimedLeg = trip.legs.first(where: { $0.isTimedLeg }) else {
             let error = "Keine TimedLeg gefunden"
+            #if DEBUG
             print("⚠️ [WARNING] \(error)")
-            await MainActor.run {
-                self.lastError = error
-            }
+            #endif
+            self.lastError = error
             return
         }
         
         guard let boardStop = firstTimedLeg.boardStopName,
-              let departureTime = firstTimedLeg.departureTime,
               let serviceName = firstTimedLeg.serviceName,
               let serviceType = firstTimedLeg.serviceType,
               let destination = firstTimedLeg.destinationLabel else {
             let error = "Unvollständige Trip-Daten"
+            #if DEBUG
             print("⚠️ [WARNING] \(error)")
-            await MainActor.run {
-                self.lastError = error
-            }
+            #endif
+            self.lastError = error
             return
         }
         
-        let lastLeg = trip.legs.last { $0.isTimedLeg }
-        let arrivalTime = lastLeg?.arrivalTime ?? trip.endTime
+        let lastTimedLeg = trip.legs.last { $0.isTimedLeg }
+        
+        // ⚠️ WICHTIG: Verwende trip.startTime / trip.endTime als Gesamtzeiten,
+        // damit die Live Activity die gleichen Zeiten zeigt wie die TripCard.
+        // firstTimedLeg.departureTime kann abweichen wenn der Trip mit Fußweg startet.
+        let tripDepartureISO = trip.startTime
+        let tripArrivalISO = trip.endTime
+        
+        // Für den initialen State verwende die erste TimedLeg-Abfahrt (für Delay-Berechnung)
+        let firstLegDepartureTime = firstTimedLeg.departureTime ?? trip.startTime
+        
+        let startStation = boardStop
+        let endStation = lastTimedLeg?.alightStopName ?? trip.legs.last?.alightStopName ?? "Ziel"
+        
+        #if DEBUG
+        print("📋 [DEBUG] Trip-Zeiten:")
+        print("   trip.startTime:              \(trip.startTime)")
+        print("   trip.endTime:                \(trip.endTime)")
+        print("   firstTimedLeg.departureTime: \(firstTimedLeg.departureTime ?? "nil")")
+        print("   lastTimedLeg.arrivalTime:    \(lastTimedLeg?.arrivalTime ?? "nil")")
+        print("   → departureTimeISO (Activity): \(tripDepartureISO)")
+        print("   → arrivalTimeISO (Activity):   \(tripArrivalISO)")
+        #endif
         
         let attributes = TripLiveActivityAttributes(
             tripId: trip.id.uuidString,
-            startStation: boardStop,
-            endStation: trip.legs.last?.alightStopName ?? "Ziel",
+            startStation: startStation,
+            endStation: endStation,
             totalLegs: trip.legs.filter { $0.isTimedLeg }.count,
-            departureTimeISO: departureTime,
-            arrivalTimeISO: arrivalTime
+            departureTimeISO: tripDepartureISO,
+            arrivalTimeISO: tripArrivalISO
         )
         
         let initialDelay = formatter.calculateDelay(
-            timetabled: departureTime,
+            timetabled: firstLegDepartureTime,
             estimated: firstTimedLeg.estimatedDepartureTime
         )
         
         let initialState = TripLiveActivityAttributes.ContentState(
             currentLegIndex: 0,
             nextStopName: boardStop,
-            nextStopTime: formatter.formatTime(departureTime),
+            nextStopTime: formatter.formatTime(firstLegDepartureTime),
             estimatedTime: firstTimedLeg.estimatedDepartureTime.map { formatter.formatTime($0) },
             delay: initialDelay,
             destination: destination,
@@ -230,8 +274,8 @@ class LiveActivityManager: ObservableObject {
 
         let now = Date()
         let staleDate = Self.calculateNextStaleDate(
-            departureTimeISO: departureTime,
-            arrivalTimeISO: arrivalTime,
+            departureTimeISO: tripDepartureISO,
+            arrivalTimeISO: tripArrivalISO,
             delay: initialDelay,
             currentTime: now
         )
@@ -243,15 +287,21 @@ class LiveActivityManager: ObservableObject {
                 pushType: nil
             )
             
+            #if DEBUG
             print("✅ [SUCCESS] Activity erfolgreich erstellt!")
             print("  - Activity ID: \(activity.id)")
+            print("  - Departure: \(tripDepartureISO)")
+            print("  - Arrival: \(tripArrivalISO)")
             print("  - Stale Date: \(staleDate?.description ?? "nil")")
+            #endif
             
-            await MainActor.run {
-                self.activeActivities[trip.id.uuidString] = activity
-                self.activeTrips[trip.id.uuidString] = trip
-                self.lastError = nil
-            }
+            self.activeActivities[trip.id.uuidString] = activity
+            self.activeTrips[trip.id.uuidString] = trip
+            self.lastError = nil
+
+            // Widget-Daten in UserDefaults speichern
+            let widgetData = Self.convertTripToWidgetData(trip)
+            Self.activityState.saveTripDataForWidget(widgetData)
             
             await startAutoUpdates(for: trip)
 
@@ -260,18 +310,16 @@ class LiveActivityManager: ObservableObject {
             
         } catch let error as NSError {
             let errorMsg = "Fehler beim Starten: \(error.localizedDescription) (Code: \(error.code))"
+            #if DEBUG
             print("❌ [ERROR] \(errorMsg)")
-            
-            await MainActor.run {
-                self.lastError = errorMsg
-            }
+            #endif
+            self.lastError = errorMsg
         } catch {
             let errorMsg = "Unbekannter Fehler: \(error)"
+            #if DEBUG
             print("❌ [ERROR] \(errorMsg)")
-            
-            await MainActor.run {
-                self.lastError = errorMsg
-            }
+            #endif
+            self.lastError = errorMsg
         }
     }
 
@@ -280,7 +328,7 @@ class LiveActivityManager: ObservableObject {
     /// Berechnet den nächsten Zeitpunkt, an dem iOS die Activity neu rendern soll.
     /// Das ist der Schlüssel: staleDate sorgt dafür, dass iOS die Activity genau
     /// zum Zeitpunkt des Phasenwechsels aktualisiert.
-    static func calculateNextStaleDate(
+    nonisolated static func calculateNextStaleDate(
         departureTimeISO: String,
         arrivalTimeISO: String,
         delay: Int?,
@@ -318,42 +366,42 @@ class LiveActivityManager: ObservableObject {
     
     // MARK: - Automatische Updates mit adaptivem Intervall
     
-    private func startAutoUpdates(for trip: DetailedTrip) async {
+    private func startAutoUpdates(for trip: DetailedTrip) {
         let tripId = trip.id.uuidString
 
+        #if DEBUG
         print("⏰ [DEBUG] Starte Auto-Update für Trip: \(String(tripId.prefix(8)))")
+        #endif
 
-        await MainActor.run {
-            updateTimers[tripId]?.invalidate()
-            updateTimers.removeValue(forKey: tripId)
+        updateTimers[tripId]?.invalidate()
+        updateTimers.removeValue(forKey: tripId)
 
-            let startTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
-                Task {
-                    await self?.fetchAndUpdateLiveActivity(trip: trip)
-                }
+        let startTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                await self?.fetchAndUpdateLiveActivity(trip: trip)
             }
-            RunLoop.main.add(startTimer, forMode: .common)
-            updateTimers[tripId] = startTimer
         }
+        RunLoop.main.add(startTimer, forMode: .common)
+        updateTimers[tripId] = startTimer
     }
     
     private func fetchAndUpdateLiveActivity(trip: DetailedTrip) async {
-        guard let activity = await MainActor.run(body: { activeActivities[trip.id.uuidString] }) else {
+        guard let activity = activeActivities[trip.id.uuidString] else {
             return
         }
         
         let activityState = await activity.activityState
         guard activityState != .dismissed && activityState != .ended else {
-            await MainActor.run {
-                updateTimers[trip.id.uuidString]?.invalidate()
-                updateTimers.removeValue(forKey: trip.id.uuidString)
-            }
+            updateTimers[trip.id.uuidString]?.invalidate()
+            updateTimers.removeValue(forKey: trip.id.uuidString)
             return
         }
         
         let now = Date()
-        let departureISO = trip.legs.first(where: { $0.isTimedLeg })?.departureTime ?? trip.startTime
-        let arrivalISO = trip.legs.last(where: { $0.isTimedLeg })?.arrivalTime ?? trip.endTime
+        
+        // Verwende die Trip-Zeiten (nicht die Leg-Zeiten) für Phase-Bestimmung
+        let departureISO = trip.startTime
+        let arrivalISO = trip.endTime
 
         let isBeforeDeparture = formatter.isBeforeDeparture(departureISO, at: now)
         let isArrived = formatter.isArrived(arrivalISO, at: now)
@@ -403,6 +451,10 @@ class LiveActivityManager: ObservableObject {
             ActivityContent(state: newState, staleDate: staleDate)
         )
 
+        // Widget-Daten aktualisieren, damit Home-Screen-Widgets den neuesten Stand zeigen
+        let widgetData = Self.convertTripToWidgetData(trip)
+        Self.activityState.saveTripDataForWidget(widgetData)
+
         // Timer-Intervall für den nächsten Update
         let nextInterval = getUpdateInterval(
             departureTimeISO: departureISO,
@@ -411,19 +463,19 @@ class LiveActivityManager: ObservableObject {
         )
         
         let tripId = trip.id.uuidString
-        await MainActor.run {
-            updateTimers[tripId]?.invalidate()
-            
-            let nextTimer = Timer.scheduledTimer(withTimeInterval: nextInterval, repeats: false) { [weak self] _ in
-                Task {
-                    await self?.fetchAndUpdateLiveActivity(trip: trip)
-                }
+        updateTimers[tripId]?.invalidate()
+        
+        let nextTimer = Timer.scheduledTimer(withTimeInterval: nextInterval, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                await self?.fetchAndUpdateLiveActivity(trip: trip)
             }
-            RunLoop.main.add(nextTimer, forMode: .common)
-            updateTimers[tripId] = nextTimer
-            
-            print("⏰ [UPDATE] Phase: \(currentPhase) | Nächster Update in \(Int(nextInterval))s | Stale: \(staleDate?.description ?? "nil")")
         }
+        RunLoop.main.add(nextTimer, forMode: .common)
+        updateTimers[tripId] = nextTimer
+        
+        #if DEBUG
+        print("⏰ [UPDATE] Phase: \(currentPhase) | Nächster Update in \(Int(nextInterval))s | Stale: \(staleDate?.description ?? "nil")")
+        #endif
     }
     
     private func getCurrentLeg(for trip: DetailedTrip) -> TripLeg? {
@@ -444,12 +496,14 @@ class LiveActivityManager: ObservableObject {
 
     // MARK: - App Lifecycle
 
-    @objc private func appDidEnterBackground() {
+    private func handleDidEnterBackground() {
+        #if DEBUG
         print("📱 [LIFECYCLE] App geht in den Hintergrund")
+        #endif
 
         // Sofort ein letztes Update mit korrektem staleDate machen
         Task {
-            for (tripId, trip) in activeTrips {
+            for (_, trip) in activeTrips {
                 await fetchAndUpdateLiveActivity(trip: trip)
             }
         }
@@ -458,12 +512,14 @@ class LiveActivityManager: ObservableObject {
         Self.scheduleBackgroundTask()
     }
 
-    @objc private func appWillEnterForeground() {
+    private func handleWillEnterForeground() {
+        #if DEBUG
         print("📱 [LIFECYCLE] App kommt in den Vordergrund")
+        #endif
 
         // Sofort alle Activities aktualisieren
         Task {
-            for (tripId, trip) in activeTrips {
+            for (_, trip) in activeTrips {
                 await fetchAndUpdateLiveActivity(trip: trip)
             }
         }
@@ -472,74 +528,81 @@ class LiveActivityManager: ObservableObject {
     // MARK: - Live Activity beenden
     
     func endActivity(tripId: String) async {
+        #if DEBUG
         print("🛑 [DEBUG] endActivity für Trip: \(String(tripId.prefix(8)))")
+        #endif
         
-        await MainActor.run {
-            updateTimers[tripId]?.invalidate()
-            updateTimers.removeValue(forKey: tripId)
-            activeTrips.removeValue(forKey: tripId)
-            print("⏰ [DEBUG] Timer gestoppt für Trip: \(String(tripId.prefix(8)))")
-        }
+        updateTimers[tripId]?.invalidate()
+        updateTimers.removeValue(forKey: tripId)
+        activeTrips.removeValue(forKey: tripId)
         
-        guard let activity = await MainActor.run(body: { activeActivities[tripId] }) else {
+        guard let activity = activeActivities[tripId] else {
+            #if DEBUG
             print("⚠️ [WARNING] Keine aktive Live Activity zum Beenden gefunden")
+            #endif
             return
         }
         
         await activity.end(nil, dismissalPolicy: .immediate)
         
-        await MainActor.run {
-            self.activeActivities.removeValue(forKey: tripId)
-            self.lastError = nil
-        }
+        self.activeActivities.removeValue(forKey: tripId)
+        self.lastError = nil
+
+        // Widget-Daten für diesen Trip entfernen
+        Self.activityState.removeTripDataForWidget(tripId: tripId)
         
+        #if DEBUG
         print("✅ [SUCCESS] Live Activity beendet")
+        #endif
     }
     
     // MARK: - Alle Activities beenden
     
     func endAllActivities() async {
+        #if DEBUG
         print("🧹 [DEBUG] Beende alle aktiven Live Activities...")
+        #endif
         
-        let activityIds = await MainActor.run {
-            Array(activeActivities.keys)
-        }
+        let activityIds = Array(activeActivities.keys)
         
         for tripId in activityIds {
             await endActivity(tripId: tripId)
         }
         
+        #if DEBUG
         print("✅ [SUCCESS] Alle Live Activities beendet")
+        #endif
     }
     
     // MARK: - Alle Activities beenden UND Toggles zurücksetzen
     
     func endAllActivitiesAndResetToggles() async {
+        #if DEBUG
         print("🧹 [DEBUG] Beende alle aktiven Live Activities und setze Toggles zurück...")
+        #endif
         
-        let activityIds = await MainActor.run {
-            Array(self.activeActivities.keys)
-        }
+        let activityIds = Array(self.activeActivities.keys)
         
         for tripId in activityIds {
-            await MainActor.run {
-                self.updateTimers[tripId]?.invalidate()
-                self.updateTimers.removeValue(forKey: tripId)
-            }
+            self.updateTimers[tripId]?.invalidate()
+            self.updateTimers.removeValue(forKey: tripId)
             
-            if let activity = await MainActor.run(body: { self.activeActivities[tripId] }) {
+            if let activity = self.activeActivities[tripId] {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
             
             Self.activityState.setTripActive(tripId, isActive: false)
         }
         
-        await MainActor.run {
-            self.activeActivities.removeAll()
-            self.activeTrips.removeAll()
-        }
+        self.activeActivities.removeAll()
+        self.activeTrips.removeAll()
+
+        // Alle Widget-Daten entfernen
+        Self.activityState.removeAllTripDataForWidget()
         
+        #if DEBUG
         print("✅ [SUCCESS] Alle Live Activities beendet und Toggles zurückgesetzt")
+        #endif
     }
     
     // MARK: - Adaptives Update-Intervall
@@ -575,26 +638,47 @@ class LiveActivityManager: ObservableObject {
         return 60
     }
 
+    // MARK: - Widget-Daten Konvertierung
+
+    /// Konvertiert einen DetailedTrip in WidgetTripDataForApp für die Home-Screen-Widgets.
+    private static func convertTripToWidgetData(_ trip: DetailedTrip) -> WidgetTripDataForApp {
+        let startStation = trip.legs.first(where: { $0.isTimedLeg })?.boardStopName ?? "Start"
+        let endStation = trip.legs.last(where: { $0.isTimedLeg })?.alightStopName ?? "Ziel"
+
+        let widgetLegs = trip.legs.map { leg in
+            WidgetTripLegDataForApp(
+                legType: leg.type.rawValue,
+                boardStopName: leg.boardStopName,
+                alightStopName: leg.alightStopName,
+                departureTime: leg.departureTime,
+                arrivalTime: leg.arrivalTime,
+                serviceName: leg.serviceName,
+                serviceType: leg.serviceType,
+                destinationLabel: leg.destinationLabel
+            )
+        }
+
+        return WidgetTripDataForApp(
+            id: trip.id.uuidString,
+            startTime: trip.startTime,
+            endTime: trip.endTime,
+            interchanges: trip.interchanges,
+            startStation: startStation,
+            endStation: endStation,
+            legs: widgetLegs
+        )
+    }
+
     // MARK: - Deinit
 
     deinit {
+        // Token-basiertes Entfernen – greift nicht auf self zu, daher sicher in nonisolated deinit
+        for observer in notificationObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        #if DEBUG
         print("🗑️ [DEINIT] LiveActivityManager wird freigegeben")
-
-        NotificationCenter.default.removeObserver(self)
-
-        let timersToStop = updateTimers
-        let block = {
-            for (tripId, timer) in timersToStop {
-                timer.invalidate()
-                print("⏰ [CLEANUP] Timer gestoppt für Trip: \(String(tripId.prefix(8)))")
-            }
-        }
-
-        if Thread.isMainThread {
-            block()
-        } else {
-            DispatchQueue.main.sync(execute: block)
-        }
+        #endif
     }
 }
 
@@ -605,6 +689,8 @@ extension ActivityState: @retroactive CustomStringConvertible {
         case .active: return "active"
         case .dismissed: return "dismissed"
         case .ended: return "ended"
+        case .stale: return "stale"
+        case .pending: return "pending"
         @unknown default: return "unknown"
         }
     }

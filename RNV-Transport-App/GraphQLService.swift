@@ -35,11 +35,62 @@ enum LegType: String, Codable {
 }
 
 struct DetailedTrip: Identifiable {
-    let id = UUID()
+    let id: UUID
     let startTime: String
     let endTime: String
     let interchanges: Int
     let legs: [TripLeg]
+
+    init(startTime: String, endTime: String, interchanges: Int, legs: [TripLeg]) {
+        self.startTime = startTime
+        self.endTime = endTime
+        self.interchanges = interchanges
+        self.legs = legs
+        self.id = Self.generateStableID(startTime: startTime, endTime: endTime, legs: legs)
+    }
+
+    /// Erzeugt eine deterministische UUID basierend auf Trip-Inhalt.
+    /// So bekommt derselbe Trip bei jedem API-Abruf die gleiche ID –
+    /// entscheidend für korrekte Live-Activity-Zuordnung.
+    private static func generateStableID(startTime: String, endTime: String, legs: [TripLeg]) -> UUID {
+        let firstTimedLeg = legs.first(where: { $0.type == .timedLeg })
+        let lastTimedLeg = legs.last(where: { $0.type == .timedLeg })
+        let stableString = [
+            startTime,
+            endTime,
+            firstTimedLeg?.departureTime ?? "",
+            firstTimedLeg?.serviceName ?? "",
+            firstTimedLeg?.boardStopName ?? "",
+            lastTimedLeg?.alightStopName ?? ""
+        ].joined(separator: "|")
+
+        // Deterministischer Hash → UUID (djb2-Variante, 2×64 Bit)
+        var h1: UInt64 = 5381
+        var h2: UInt64 = 5381
+        for (i, byte) in stableString.utf8.enumerated() {
+            if i % 2 == 0 {
+                h1 = ((h1 &<< 5) &+ h1) &+ UInt64(byte)
+            } else {
+                h2 = ((h2 &<< 5) &+ h2) &+ UInt64(byte)
+            }
+        }
+
+        var bytes = [UInt8](repeating: 0, count: 16)
+        withUnsafeBytes(of: h1.bigEndian) { buf in
+            for i in 0..<8 { bytes[i] = buf[i] }
+        }
+        withUnsafeBytes(of: h2.bigEndian) { buf in
+            for i in 0..<8 { bytes[i + 8] = buf[i] }
+        }
+        // UUID Version-5- und Variant-Bits setzen
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+
+        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3],
+                           bytes[4], bytes[5], bytes[6], bytes[7],
+                           bytes[8], bytes[9], bytes[10], bytes[11],
+                           bytes[12], bytes[13], bytes[14], bytes[15]))
+    }
 }
 
 struct TripLeg: Identifiable {
@@ -84,14 +135,18 @@ class GraphQLService: ObservableObject {
 
     init() {
         self.baseURL = Self.loadGraphQLURL()
+        #if DEBUG
         print("📡 [GraphQL] Service initialisiert mit URL: \(self.baseURL)")
+        #endif
     }
 
     private static func loadGraphQLURL() -> String {
         let fallbackURL = "https://graphql-sandbox-dds.rnv-online.de/"
 
         guard let bundleURL = Bundle.main.object(forInfoDictionaryKey: "RNV_GRAPHQL_URL") as? String else {
+            #if DEBUG
             print("⚠️ [GraphQL] RNV_GRAPHQL_URL nicht in Info.plist gefunden")
+            #endif
             return fallbackURL
         }
 
@@ -99,16 +154,22 @@ class GraphQLService: ObservableObject {
         let trimmedURL = bundleURL.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
 
         guard !trimmedURL.contains("$(") else {
+            #if DEBUG
             print("❌ [GraphQL] Variable nicht aufgelöst: \(trimmedURL)")
+            #endif
             return fallbackURL
         }
 
         guard !trimmedURL.isEmpty, URL(string: trimmedURL) != nil else {
+            #if DEBUG
             print("❌ [GraphQL] Ungültige URL: \(trimmedURL)")
+            #endif
             return fallbackURL
         }
 
+        #if DEBUG
         print("✅ [GraphQL] URL erfolgreich geladen: \(trimmedURL)")
+        #endif
         return trimmedURL
     }
 
@@ -240,6 +301,13 @@ class GraphQLService: ObservableObject {
         let safeTo = sanitize(toGlobalID)
         let safeTime = sanitize(searchTime)
 
+        #if DEBUG
+        print("🔍 [GraphQL] getConnections aufgerufen:")
+        print("   originGlobalID: \(safeFrom)")
+        print("   destinationGlobalID: \(safeTo)")
+        print("   departureTime: \(safeTime)")
+        #endif
+
         let query = """
         {
           trips(
@@ -305,13 +373,26 @@ class GraphQLService: ObservableObject {
         do {
             let data = try await executeQuery(query: query, accessToken: accessToken)
 
+            #if DEBUG
+            if let rawResponse = String(data: data, encoding: .utf8) {
+                let preview = rawResponse.prefix(500)
+                print("📦 [GraphQL] getConnections Antwort (\(data.count) bytes): \(preview)")
+            }
+            #endif
+
             if let gqlError = extractGraphQLErrors(from: data) {
                 lastError = gqlError
+                #if DEBUG
+                print("❌ [GraphQL] Fehler in Antwort: \(gqlError.message)")
+                #endif
             }
 
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let responseData = json["data"] as? [String: Any],
                let trips = responseData["trips"] as? [[String: Any]] {
+                #if DEBUG
+                print("🚆 [GraphQL] \(trips.count) Trips gefunden")
+                #endif
 
                 self.detailedTrips = trips.compactMap { trip -> DetailedTrip? in
                     guard let startTimeDict = trip["startTime"] as? [String: Any],
@@ -384,8 +465,10 @@ class GraphQLService: ObservableObject {
     // MARK: - Live Updates
 
     func getLiveTripUpdates(tripId: String, accessToken: String) async -> DetailedTrip? {
+        #if DEBUG
         print("🔄 [GraphQL] Rufe Live-Updates ab für Trip: \(tripId)")
         print("⚠️ [GraphQL] Live-Update API noch nicht implementiert")
+        #endif
         return nil
     }
 
@@ -407,7 +490,9 @@ class GraphQLService: ObservableObject {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
+            #if DEBUG
             print("📡 [GraphQL] Response Status: \(httpResponse.statusCode)")
+            #endif
 
             guard (200...299).contains(httpResponse.statusCode) else {
                 throw GraphQLError(message: "HTTP-Fehler: \(httpResponse.statusCode)")

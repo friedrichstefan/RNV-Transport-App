@@ -26,15 +26,20 @@ struct EndActivityIntent: LiveActivityIntent {
     }
     
     func perform() async throws -> some IntentResult {
+        #if DEBUG
         print("🛑 [INTENT] EndActivityIntent aufgerufen für Trip: \(String(tripId.prefix(8)))")
+        #endif
         
         LiveActivityState.shared.setTripActive(tripId, isActive: false)
+        LiveActivityState.shared.removeTripDataForWidget(tripId: tripId)
         
         let activities = Activity<TripLiveActivityAttributes>.activities
         
         for activity in activities {
             if activity.attributes.tripId == tripId {
+                #if DEBUG
                 print("✅ [INTENT] Beende Activity: \(activity.id)")
+                #endif
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
         }

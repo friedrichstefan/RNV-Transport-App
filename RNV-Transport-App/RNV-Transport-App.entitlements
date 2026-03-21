@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.Stefan.rnvapp</string>
+		<string>group.com.stefanfriedrich.rnvapp</string>
 	</array>
 </dict>
 </plist>

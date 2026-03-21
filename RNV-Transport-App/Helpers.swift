@@ -7,11 +7,14 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 // MARK: - DateFormattingHelper
 
-class DateFormattingHelper {
+final class DateFormattingHelper: @unchecked Sendable {
     static let shared = DateFormattingHelper()
+
+    private let lock = NSLock()
 
     private let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -62,20 +65,28 @@ class DateFormattingHelper {
 
     func formatTime(_ isoString: String) -> String {
         guard let date = parseISO8601(isoString) else { return isoString }
+        lock.lock()
+        defer { lock.unlock() }
         return timeFormatter.string(from: date)
     }
 
     func formatTimeFromDate(_ date: Date) -> String {
+        lock.lock()
+        defer { lock.unlock() }
         return timeFormatter.string(from: date)
     }
 
     func formatDate(_ isoString: String) -> String {
         guard let date = parseISO8601(isoString) else { return isoString }
+        lock.lock()
+        defer { lock.unlock() }
         return dateFormatter.string(from: date)
     }
 
     func formatDateTime(_ isoString: String) -> String {
         guard let date = parseISO8601(isoString) else { return isoString }
+        lock.lock()
+        defer { lock.unlock() }
         return fullDateTimeFormatter.string(from: date)
     }
 
@@ -129,31 +140,137 @@ class DateFormattingHelper {
 // MARK: - TransportIconHelper
 
 struct TransportIconHelper {
-    static func getLineColor(for serviceType: String?) -> Color {
-        switch serviceType {
-        case "STRASSENBAHN": return .red
-        case "BUS": return .blue
-        case "S_BAHN": return .green
-        default: return .gray
+    /// Prüft, ob ein Leg eine S-Bahn ist – anhand serviceType ODER serviceName (z. B. "S1", "S3")
+    static func isSBahnLine(serviceType: String?, serviceName: String?) -> Bool {
+        let type = (serviceType ?? "").uppercased()
+        if type.contains("S_BAHN") || type.contains("SBAHN") || type.contains("SUBURBAN") {
+            return true
         }
+        // Fallback: Linienname beginnt mit "S" gefolgt von einer Ziffer (z. B. S1, S3, S33)
+        let name = (serviceName ?? "").trimmingCharacters(in: .whitespaces)
+        if name.count >= 2,
+           name.uppercased().first == "S",
+           let secondChar = name.dropFirst().first,
+           secondChar.isNumber {
+            return true
+        }
+        return false
     }
 
-    static func getTransportIcon(for serviceType: String?) -> String {
-        switch serviceType {
-        case "STRASSENBAHN": return "tram.fill"
-        case "BUS": return "bus.fill"
-        case "S_BAHN": return "train.side.front.car"
-        default: return "questionmark"
+    /// Prüft, ob ein Leg ein Regionalzug ist – anhand serviceType ODER serviceName (z. B. "RE10a", "RB40", "MEX12")
+    static func isRegionalLine(serviceType: String?, serviceName: String?) -> Bool {
+        let type = (serviceType ?? "").uppercased()
+        if type.contains("REGIONAL") || type.contains("_RE") || type.contains("RB") || type.contains("MEX") {
+            return true
         }
+        // Fallback: Linienname beginnt mit "RE" oder "RB" gefolgt von einer Ziffer
+        let name = (serviceName ?? "").trimmingCharacters(in: .whitespaces).uppercased()
+        if name.count >= 3,
+           (name.hasPrefix("RE") || name.hasPrefix("RB")),
+           let digitChar = name.dropFirst(2).first,
+           digitChar.isNumber {
+            return true
+        }
+        // MEX-Sonderfall: Präfix ist 3 Zeichen lang (z. B. "MEX12", "MEX16a")
+        if name.count >= 4,
+           name.hasPrefix("MEX"),
+           let digitChar = name.dropFirst(3).first,
+           digitChar.isNumber {
+            return true
+        }
+        return false
+    }
+
+    /// Prüft, ob ein Leg ein Fernverkehrszug ist (ICE, IC, EC, TGV, RJX, FLX)
+    static func isLongDistanceLine(serviceType: String?, serviceName: String?) -> Bool {
+        let type = (serviceType ?? "").uppercased()
+        if type.contains("ICE") || type.contains("INTERCITY") || type.contains("FERNVERKEHR") || type.contains("HOCHGESCHWINDIGKEIT") {
+            return true
+        }
+        let name = (serviceName ?? "").trimmingCharacters(in: .whitespaces).uppercased()
+        // ICE vor IC prüfen, da "IC".hasPrefix auch auf "ICE" matchen würde
+        if name.hasPrefix("ICE") || name.hasPrefix("EC") || name.hasPrefix("TGV") || name.hasPrefix("RJX") || name.hasPrefix("FLX") || name.hasPrefix("IC") {
+            return true
+        }
+        return false
+    }
+
+    static func getLineColor(for serviceType: String?, serviceName: String? = nil) -> Color {
+        if isSBahnLine(serviceType: serviceType, serviceName: serviceName) {
+            return .green
+        }
+        if isLongDistanceLine(serviceType: serviceType, serviceName: serviceName) {
+            return Color(red: 0.55, green: 0.0, blue: 0.05)
+        }
+        if isRegionalLine(serviceType: serviceType, serviceName: serviceName) {
+            return Color(red: 0.4, green: 0.1, blue: 0.6)
+        }
+        let type = (serviceType ?? "").uppercased()
+        if type.contains("STRASSENBAHN") || type.contains("TRAM") {
+            return .red
+        } else if type.contains("BUS") {
+            return .blue
+        }
+        return .gray
+    }
+
+    static func getTransportIcon(for serviceType: String?, serviceName: String? = nil) -> String {
+        if isSBahnLine(serviceType: serviceType, serviceName: serviceName) {
+            return "s.circle.fill"
+        }
+        if isLongDistanceLine(serviceType: serviceType, serviceName: serviceName) {
+            return "train.side.front.car"
+        }
+        if isRegionalLine(serviceType: serviceType, serviceName: serviceName) {
+            return "tram.fill"
+        }
+        let type = (serviceType ?? "").uppercased()
+        if type.contains("STRASSENBAHN") || type.contains("TRAM") {
+            return "lightrail.fill"
+        } else if type.contains("BUS") {
+            return "bus.fill"
+        }
+        return "questionmark"
     }
 
     /// Entfernt Präfixe aus Liniennamen für kompaktere Darstellung
     static func getShortLineName(from serviceName: String?) -> String {
         guard let name = serviceName else { return "?" }
-        // Entferne bekannte Präfixe
         return name
             .replacingOccurrences(of: "RNV ", with: "")
             .replacingOccurrences(of: "rnv ", with: "")
             .replacingOccurrences(of: "Linie ", with: "")
+    }
+}
+
+// MARK: - ShareSheet (UIActivityViewController Wrapper)
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - HapticHelper
+
+struct HapticHelper {
+    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.impactOccurred()
+    }
+
+    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(type)
+    }
+
+    static func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
     }
 }

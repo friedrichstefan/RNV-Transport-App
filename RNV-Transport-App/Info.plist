@@ -49,6 +49,19 @@
             </dict>
         </dict>
         
+        <!-- Background Task Identifier für BGTaskScheduler -->
+        <key>BGTaskSchedulerPermittedIdentifiers</key>
+        <array>
+            <string>com.stefanfriedrich.rnvapp.liveactivity.refresh</string>
+        </array>
+
+        <!-- Standort-Datenschutzbeschreibungen (erforderlich für CLLocationManager) -->
+        <key>NSLocationWhenInUseUsageDescription</key>
+        <string>Die App nutzt deinen Standort, um nahegelegene Haltestellen anzuzeigen und deine aktive Fahrt in der Live Activity zu verfolgen.</string>
+
+        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+        <string>Die App nutzt deinen Standort im Hintergrund, um deine Fahrt zu verfolgen und die Live Activity aktuell zu halten.</string>
+
         <!-- Background Modes -->
         <key>UIBackgroundModes</key>
         <array>

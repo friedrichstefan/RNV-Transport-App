@@ -7,6 +7,7 @@
 import Foundation
 import Combine
 
+@MainActor
 class AuthService: ObservableObject {
     @Published var accessToken: String?
     @Published var isAuthenticated = false
@@ -14,6 +15,9 @@ class AuthService: ObservableObject {
     @Published var authError: String?
 
     private var tokenExpiryDate: Date?
+    
+    /// Laufende Authentifizierungs-Task – verhindert parallele Token-Requests
+    private var activeAuthTask: Task<Void, Never>?
 
     // MARK: - Konfiguration (sicher, kein fatalError)
 
@@ -54,11 +58,15 @@ class AuthService: ObservableObject {
 
     func autoAuthenticate() async {
         if isTokenValid {
+            #if DEBUG
             print("ℹ️ [AUTH] Token noch gültig, kein erneuter Login nötig")
+            #endif
             return
         }
         if isAuthenticated && !isTokenValid {
+            #if DEBUG
             print("🔄 [AUTH] Token abgelaufen, erneuere...")
+            #endif
         }
         await authenticate()
     }
@@ -66,35 +74,48 @@ class AuthService: ObservableObject {
     // MARK: - Authentication
 
     func authenticate() async {
-        guard !isAuthenticating else { return }
-
-        await MainActor.run {
-            isAuthenticating = true
-            authError = nil
+        // Wenn bereits eine Authentifizierung läuft, auf deren Ergebnis warten
+        if let existingTask = activeAuthTask {
+            await existingTask.value
+            return
         }
+
+        isAuthenticating = true
+        authError = nil
+        
+        let task = Task { @MainActor [weak self] in
+            await self?.performAuthentication()
+            return
+        }
+        activeAuthTask = task
+        await task.value
+        activeAuthTask = nil
+    }
+    
+    private func performAuthentication() async {
 
         // Konfiguration prüfen
         guard let id = clientID else {
-            await setError("RNV_CLIENT_ID ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_CLIENT_ID ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
             return
         }
         guard let secret = clientSecret else {
-            await setError("RNV_CLIENT_SECRET ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_CLIENT_SECRET ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
             return
         }
         guard let tenant = tenantID else {
-            await setError("RNV_TENANT_ID ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_TENANT_ID ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
             return
         }
         guard let res = resource else {
-            await setError("RNV_RESOURCE ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_RESOURCE ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
             return
         }
 
         let urlString = "https://login.microsoftonline.com/\(tenant)/oauth2/token"
 
         guard let url = URL(string: urlString) else {
-            await setError("Ungültige Auth-URL.")
+            setError("Ungültige Auth-URL.")
             return
         }
 
@@ -102,7 +123,7 @@ class AuthService: ObservableObject {
         guard let encodedID     = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let encodedSecret = secret.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let encodedRes    = res.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            await setError("Fehler beim URL-Encoding der Credentials.")
+            setError("Fehler beim URL-Encoding der Credentials.")
             return
         }
 
@@ -118,7 +139,7 @@ class AuthService: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse,
                !(200...299).contains(httpResponse.statusCode) {
-                await setError("Auth-Server antwortete mit Status \(httpResponse.statusCode).")
+                setError("Auth-Server antwortete mit Status \(httpResponse.statusCode).")
                 return
             }
 
@@ -128,34 +149,37 @@ class AuthService: ObservableObject {
                     let expiresIn = json["expires_in"] as? TimeInterval ?? 3600
                     let expiry = Date().addingTimeInterval(expiresIn)
 
-                    await MainActor.run {
-                        self.accessToken = token
-                        self.tokenExpiryDate = expiry
-                        self.isAuthenticated = true
-                        self.isAuthenticating = false
-                        self.authError = nil
-                    }
+                    self.accessToken = token
+                    self.tokenExpiryDate = expiry
+                    self.isAuthenticated = true
+                    self.isAuthenticating = false
+                    self.authError = nil
+                    #if DEBUG
                     print("✅ [AUTH] Anmeldung erfolgreich. Token läuft ab um: \(expiry)")
+                    #endif
                 } else if let errorDesc = json["error_description"] as? String {
-                    await setError("Auth-Fehler: \(errorDesc)")
+                    setError("Auth-Fehler: \(errorDesc)")
                 } else {
-                    await setError("Unbekannte Auth-Antwort vom Server.")
+                    setError("Unbekannte Auth-Antwort vom Server.")
                 }
+            } else {
+                // JSON konnte nicht als Dictionary geparst werden (z.B. leere oder unerwartete Antwort)
+                setError("Ungültiges Antwortformat vom Auth-Server.")
             }
         } catch {
-            await setError("Netzwerkfehler: \(error.localizedDescription)")
+            setError("Netzwerkfehler: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Hilfsfunktionen
 
-    private func setError(_ message: String) async {
+    private func setError(_ message: String) {
+        #if DEBUG
         print("❌ [AUTH] \(message)")
-        await MainActor.run {
-            self.authError = message
-            self.isAuthenticating = false
-            self.isAuthenticated = false
-        }
+        #endif
+        self.authError = message
+        self.isAuthenticating = false
+        self.isAuthenticated = false
     }
 
     func logout() {
@@ -163,6 +187,8 @@ class AuthService: ObservableObject {
         tokenExpiryDate = nil
         isAuthenticated = false
         authError = nil
+        #if DEBUG
         print("🔓 [AUTH] Abgemeldet")
+        #endif
     }
 }

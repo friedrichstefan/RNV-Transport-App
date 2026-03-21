@@ -55,7 +55,9 @@ class SecureGraphQLService: GraphQLService {
         request.httpBody = bodyData
         requestSigner.signRequest(&request, withBody: bodyData)
 
+        #if DEBUG
         print("🔒 [SECURE_GQL] Sichere Anfrage an: \(url.host ?? "")")
+        #endif
 
         let (data, response) = try await secureSession.data(for: request)
 
@@ -64,7 +66,9 @@ class SecureGraphQLService: GraphQLService {
         }
 
         if let httpResponse = response as? HTTPURLResponse {
+            #if DEBUG
             print("📡 [SECURE_GQL] Response Status: \(httpResponse.statusCode)")
+            #endif
             guard (200...299).contains(httpResponse.statusCode) else {
                 throw GraphQLError(message: "HTTP-Fehler: \(httpResponse.statusCode)")
             }
@@ -82,17 +86,23 @@ class SecureGraphQLService: GraphQLService {
     // MARK: - Certificate Hash Setup
 
     func setupCertificatePinning() {
+        #if DEBUG
         print("🔧 [SETUP] Certificate Pinning wird konfiguriert...")
+        #endif
 
         SSLPinningDelegate.extractCertificateHash(for: "graphql-sandbox-dds.rnv-online.de") { hash in
             if let hash = hash {
+                #if DEBUG
                 print("📋 [SETUP] GraphQL Certificate Hash: \(hash)")
+                #endif
             }
         }
 
         SSLPinningDelegate.extractCertificateHash(for: "login.microsoftonline.com") { hash in
             if let hash = hash {
+                #if DEBUG
                 print("📋 [SETUP] Microsoft Certificate Hash: \(hash)")
+                #endif
             }
         }
     }

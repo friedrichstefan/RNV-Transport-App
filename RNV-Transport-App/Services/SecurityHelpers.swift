@@ -27,7 +27,9 @@ class KeychainHelper {
     // MARK: - Token Storage
 
     func store(token: String, account: String) throws {
-        let tokenData = token.data(using: .utf8)!
+        guard let tokenData = token.data(using: .utf8) else {
+            throw KeychainError.invalidItemFormat
+        }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -37,14 +39,23 @@ class KeychainHelper {
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
 
+        // Altes Item löschen (ignoriere "nicht gefunden")
         let deleteStatus = SecItemDelete(query as CFDictionary)
+        if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
+            #if DEBUG
+            print("⚠️ [Keychain] Löschen fehlgeschlagen: \(deleteStatus)")
+            #endif
+        }
+
         let addStatus = SecItemAdd(query as CFDictionary, nil)
 
         guard addStatus == errSecSuccess else {
             throw KeychainError.unexpectedStatus(addStatus)
         }
 
+        #if DEBUG
         print("🔐 Token sicher im Keychain gespeichert")
+        #endif
     }
 
     func retrieveToken(account: String) throws -> String {
@@ -87,7 +98,9 @@ class KeychainHelper {
             throw KeychainError.unexpectedStatus(status)
         }
 
+        #if DEBUG
         print("🗑️ Token aus Keychain gelöscht")
+        #endif
     }
 }
 
@@ -101,7 +114,9 @@ class RequestSigningHelper {
            !key.isEmpty, !key.hasPrefix("$(") {
             return key
         }
+        #if DEBUG
         print("⚠️ [SIGN] RNV_SIGNING_KEY nicht konfiguriert – Signing deaktiviert")
+        #endif
         return ""
     }
 
@@ -132,7 +147,9 @@ class RequestSigningHelper {
         request.setValue(signature, forHTTPHeaderField: "X-Signature")
         request.setValue("1.0", forHTTPHeaderField: "X-API-Version")
 
+        #if DEBUG
         print("🔐 [SIGN] Request signiert: \(request.url?.host ?? "unknown")")
+        #endif
     }
 
     private func generateHMACSignature(payload: String) -> String {
@@ -149,18 +166,24 @@ class RequestSigningHelper {
         guard let httpResponse = response as? HTTPURLResponse else { return false }
 
         guard 200...299 ~= httpResponse.statusCode else {
+            #if DEBUG
             print("⚠️ [VALIDATE] Ungültiger Status Code: \(httpResponse.statusCode)")
+            #endif
             return false
         }
 
         guard let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type"),
               contentType.lowercased().contains("application/json") else {
+            #if DEBUG
             print("⚠️ [VALIDATE] Ungültiger Content-Type")
+            #endif
             return false
         }
 
         guard data.count < 10_000_000 else {
+            #if DEBUG
             print("⚠️ [VALIDATE] Response zu groß: \(data.count) bytes")
+            #endif
             return false
         }
 
@@ -171,7 +194,9 @@ class RequestSigningHelper {
             }
             return false
         } catch {
+            #if DEBUG
             print("⚠️ [VALIDATE] JSON Parsing Fehler: \(error)")
+            #endif
             return false
         }
     }
@@ -186,7 +211,9 @@ class RequestSigningHelper {
         if let lastRequest = lastRequestTimes[host] {
             let timeSinceLastRequest = now.timeIntervalSince(lastRequest)
             if timeSinceLastRequest < minimumRequestInterval {
+                #if DEBUG
                 print("⚠️ [RATE_LIMIT] Request zu schnell für \(host)")
+                #endif
                 return false
             }
         }
@@ -219,16 +246,22 @@ class SSLPinningDelegate: NSObject, URLSessionDelegate {
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
+        #if DEBUG
         print("🔒 [SSL] Certificate validation für: \(challenge.protectionSpace.host)")
+        #endif
 
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust else {
+            #if DEBUG
             print("❌ [SSL] Ungültige Authentifizierungsmethode")
+            #endif
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
 
         guard let serverTrust = challenge.protectionSpace.serverTrust else {
+            #if DEBUG
             print("❌ [SSL] Kein Server Trust verfügbar")
+            #endif
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
@@ -237,9 +270,11 @@ class SSLPinningDelegate: NSObject, URLSessionDelegate {
         let isTrusted = SecTrustEvaluateWithError(serverTrust, &trustError)
 
         guard isTrusted else {
+            #if DEBUG
             if let error = trustError {
                 print("❌ [SSL] Trust Evaluation fehlgeschlagen: \(error)")
             }
+            #endif
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
@@ -247,24 +282,34 @@ class SSLPinningDelegate: NSObject, URLSessionDelegate {
         let host = challenge.protectionSpace.host
 
         if trustedHosts.contains(host) {
+            #if DEBUG
             print("✅ [SSL] Vertrauenswürdiger Host: \(host)")
+            #endif
 
             let pinningResult = validateCertificateChain(serverTrust: serverTrust, host: host)
             switch pinningResult {
             case .valid:
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
             case .placeholderHash:
+                #if DEBUG
                 print("⚠️ [SSL] Certificate Pinning noch nicht konfiguriert (Placeholder), verwende Standard-Validierung")
+                #endif
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
             case .mismatch(let actual, let expected):
+                #if DEBUG
                 print("❌ [SSL] Zertifikat-Hash stimmt nicht überein! Erwartet: \(expected), Gefunden: \(actual)")
+                #endif
                 completionHandler(.cancelAuthenticationChallenge, nil)
             case .extractionFailed:
+                #if DEBUG
                 print("❌ [SSL] Konnte Zertifikat nicht extrahieren")
+                #endif
                 completionHandler(.cancelAuthenticationChallenge, nil)
             }
         } else {
+            #if DEBUG
             print("❌ [SSL] Nicht vertrauenswürdiger Host: \(host)")
+            #endif
             completionHandler(.cancelAuthenticationChallenge, nil)
         }
     }
@@ -288,7 +333,9 @@ class SSLPinningDelegate: NSObject, URLSessionDelegate {
         let hash = SHA256.hash(data: serverCertData)
         let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
 
+        #if DEBUG
         print("📋 [SSL] Zertifikat Hash für \(host): \(hashString)")
+        #endif
 
         guard let expectedHash = expectedCertificateHashes[host] else {
             return .placeholderHash
@@ -315,7 +362,11 @@ class SSLPinningDelegate: NSObject, URLSessionDelegate {
 
         let extractor = CertificateHashExtractor(completion: completion)
         let session = URLSession(configuration: .default, delegate: extractor, delegateQueue: nil)
-        session.dataTask(with: url).resume()
+        let task = session.dataTask(with: url)
+        task.resume()
+        // Session nach Aufgabenabschluss invalidieren, damit der Retain-Cycle
+        // (URLSession → delegate → completion) aufgelöst wird.
+        session.finishTasksAndInvalidate()
     }
 }
 
