@@ -7,283 +7,307 @@
 
 import SwiftUI
 
-// MARK: - Enhanced TripCard with Improved Strikethrough Styles
-
 struct TripCard: View {
     let trip: DetailedTrip
     let graphQLService: GraphQLService
     let authService: AuthService
-    
-    @StateObject private var liveActivityManager: LiveActivityManager
+
+    @ObservedObject var liveActivityManager: LiveActivityManager
     @State private var isLiveActivityActive = false
-    @State private var stateCheckTimer: Timer?
-    
+    @State private var didAppear = false
+
     @Environment(\.colorScheme) private var colorScheme
-    
-    init(trip: DetailedTrip, graphQLService: GraphQLService, authService: AuthService) {
-        self.trip = trip
-        self.graphQLService = graphQLService
-        self.authService = authService
-        
-        _liveActivityManager = StateObject(
-            wrappedValue: LiveActivityManager(graphQLService: graphQLService)
-        )
+
+    private let formatter = DateFormattingHelper.shared
+
+    /// Verbindung ist abgefahren, wenn die Ankunftszeit in der Vergangenheit liegt
+    private var isPast: Bool {
+        guard let endDate = formatter.parseISO8601(trip.endTime) else { return false }
+        return endDate < Date()
     }
-    
+
+    /// Minuten bis zur Abfahrt (nil wenn bereits abgefahren)
+    private var minutesUntilDeparture: Int? {
+        let depTime = getFirstLegEstimatedDeparture() ?? trip.startTime
+        guard let depDate = formatter.parseISO8601(depTime) else { return nil }
+        let mins = Int(depDate.timeIntervalSince(Date()) / 60)
+        return mins >= 0 ? mins : nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    // Enhanced time display with improved delay styles
-                    timeDisplayWithDelay
-                    
-                    Text(calculateDuration(start: trip.startTime, end: trip.endTime))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            // Top row: Time + Status
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    timeDisplay
+                    durationRow
                 }
-                
+
                 Spacer()
-                
-                // Status badges with delay awareness
+
                 statusBadges
             }
-            
-            // Prominent delay information banner
-            if hasSignificantDelay {
-                delayInfoBanner
+
+            // Delay banner (only for significant delays)
+            if let maxDelay = getMaxDelay(), maxDelay >= 2 {
+                delayInfoBanner(delay: maxDelay)
             }
-            
-            // Enhanced transport line display with destinations
-            transportLinesWithDestinations
-            
-            Divider()
-                .padding(.vertical, 4)
-            
-            // Live Activity controls
-            if #available(iOS 16.2, *) {
-                liveActivitySection
+
+            // Transport lines
+            transportLinesSection
+
+            if !isPast {
+                Divider()
+                    .padding(.vertical, 4)
+
+                if #available(iOS 16.2, *) {
+                    liveActivitySection
+                }
             }
         }
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 8, y: 4)
+                .fill(isPast
+                    ? Color(colorScheme == .dark ? .systemGray5 : .systemGray6)
+                    : Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                .shadow(
+                    color: .black.opacity(isPast ? 0.04 : (colorScheme == .dark ? 0.3 : 0.08)),
+                    radius: isPast ? 3 : 8,
+                    y: isPast ? 1 : 4
+                )
         )
+        .opacity(isPast ? 0.58 : 1.0)
         .padding(.horizontal)
     }
-    
-    // MARK: - Enhanced Time Display with Improved Strikethrough
-    
+
+    // MARK: - Time Display
+
     @ViewBuilder
-    private var timeDisplayWithDelay: some View {
+    private var timeDisplay: some View {
         let departureDelay = getFirstLegDelay()
         let arrivalDelay = getLastLegDelay()
-        
-        HStack(spacing: 8) {
-            // Enhanced Departure time with better strikethrough styling
-            VStack(alignment: .leading, spacing: 2) {
-                if let delay = departureDelay, delay > 0 {
-                    HStack(spacing: 6) {
-                        Text(formatTime(trip.startTime))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .strikethrough(true, color: .red)
-                            .foregroundColor(.secondary)
-                        
-                        Text(formatTimeWithDelay(trip.startTime, delay: delay))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.red.opacity(0.1))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                                    )
-                            )
-                    }
-                } else {
-                    Text(formatTime(trip.startTime))
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                }
-            }
-            
+
+        HStack(spacing: 6) {
+            // Departure time
+            timeWithDelay(
+                scheduled: trip.startTime,
+                estimatedISO: getFirstLegEstimatedDeparture(),
+                delay: departureDelay
+            )
+
             Image(systemName: "arrow.right")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            
-            // Enhanced Arrival time
-            VStack(alignment: .trailing, spacing: 2) {
-                if let delay = arrivalDelay, delay > 0 {
-                    HStack(spacing: 6) {
-                        Text(formatTime(trip.endTime))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .strikethrough(true, color: .red)
-                            .foregroundColor(.secondary)
-                        
-                        Text(formatTimeWithDelay(trip.endTime, delay: delay))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.red.opacity(0.1))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                                    )
-                            )
-                    }
-                } else {
-                    Text(formatTime(trip.endTime))
-                        .font(.title2)
+                .padding(.horizontal, 2)
+
+            // Arrival time
+            timeWithDelay(
+                scheduled: trip.endTime,
+                estimatedISO: getLastLegEstimatedArrival(),
+                delay: arrivalDelay
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func timeWithDelay(scheduled: String, estimatedISO: String?, delay: Int?) -> some View {
+        if let delay = delay, delay > 0, let estimated = estimatedISO {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(formatter.formatTime(scheduled))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .strikethrough(true, color: .red.opacity(0.6))
+
+                HStack(spacing: 4) {
+                    Text(formatter.formatTime(estimated))
+                        .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(.red)
+
+                    Text("+\(delay)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(delay >= 5 ? Color.red : Color.orange))
+                }
+            }
+        } else {
+            Text(formatter.formatTime(scheduled))
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+        }
+    }
+
+    // MARK: - Duration Row
+
+    @ViewBuilder
+    private var durationRow: some View {
+        let depDelay = getFirstLegDelay() ?? 0
+        let arrDelay = getLastLegDelay() ?? 0
+        let hasDelay = depDelay > 0 || arrDelay > 0
+
+        HStack(spacing: 6) {
+            Text(formatter.calculateDuration(start: trip.startTime, end: trip.endTime))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            if hasDelay, let estDep = getFirstLegEstimatedDeparture(), let estArr = getLastLegEstimatedArrival() {
+                let realDuration = formatter.calculateDuration(start: estDep, end: estArr)
+                if realDuration != formatter.calculateDuration(start: trip.startTime, end: trip.endTime) {
+                    Text("(real \(realDuration))")
+                        .font(.caption)
+                        .foregroundColor(.orange)
                 }
             }
         }
     }
-    
-    // MARK: - Status Badges with Delay Awareness
-    
+
+    // MARK: - Status Badges
+
     @ViewBuilder
     private var statusBadges: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            // Delay status badge
-            if let maxDelay = getMaxDelay(), maxDelay > 0 {
+        VStack(alignment: .trailing, spacing: 6) {
+            // Countdown-Badge: "in X Min"
+            if !isPast, let mins = minutesUntilDeparture, mins <= 60 {
                 HStack(spacing: 3) {
-                    Image(systemName: "clock.badge.exclamationmark")
+                    Image(systemName: mins <= 5 ? "figure.run" : "timer")
                         .font(.system(size: 10))
-                    Text("+\(maxDelay) Min")
-                        .font(.caption)
+                    Text(mins == 0 ? "Jetzt" : "in \(mins) Min")
+                        .font(.caption2)
                         .fontWeight(.bold)
                 }
-                .foregroundColor(.white)
+                .foregroundColor(mins <= 5 ? .red : AppTheme.primaryColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
-                    Capsule().fill(maxDelay >= 5 ? Color.red : Color.orange)
+                    Capsule().fill(mins <= 5 ? Color.red.opacity(0.12) : AppTheme.primaryColor.opacity(0.12))
                 )
             }
-            
-            // Transfer status
-            if trip.interchanges == 0 {
-                Text("Direkt")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.green))
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.triangle.swap")
+
+            // Abgefahren-Badge für vergangene Verbindungen
+            if isPast {
+                HStack(spacing: 3) {
+                    Image(systemName: "clock.badge.xmark")
+                        .font(.system(size: 10))
+                    Text("Abgefahren")
                         .font(.caption2)
-                    Text("\(trip.interchanges)")
-                        .font(.caption)
                         .fontWeight(.semibold)
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.orange))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule().fill(Color(.systemGray5))
+                )
+            } else if getMaxDelay() == nil {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
+                    Text("Pünktlich")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule().fill(Color.green.opacity(0.12))
+                )
+            }
+
+            // Interchange badge
+            if trip.interchanges == 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                        .font(.system(size: 10))
+                    Text("Direkt")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(AppTheme.primaryColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule().fill(AppTheme.primaryColor.opacity(0.12))
+                )
+            } else {
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 10))
+                    Text("\(trip.interchanges)× Umstieg")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color(.systemGray5))
+                )
             }
         }
     }
-    
-    // MARK: - Delay Information Banner
-    
+
+    // MARK: - Delay Info Banner
+
     @ViewBuilder
-    private var delayInfoBanner: some View {
+    private func delayInfoBanner(delay: Int) -> some View {
+        let delayedLegs = getDelayedLegsCount()
+        let bannerColor: Color = delay >= 5 ? .red : .orange
+
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.red)
+            Image(systemName: delay >= 5 ? "exclamationmark.triangle.fill" : "clock.badge.exclamationmark")
+                .foregroundColor(bannerColor)
                 .font(.system(size: 14))
-            
-            Text(getDelayMessage())
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.red)
-            
-            Spacer()
-            
-            // Quick info about affected legs
-            if getDelayedLegsCount() > 1 {
-                Text("\(getDelayedLegsCount()) Teilstrecken betroffen")
-                    .font(.caption)
-                    .foregroundColor(.red.opacity(0.8))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Verspätung: +\(delay) Min.")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(bannerColor)
+
+                if delayedLegs > 1 {
+                    Text("\(delayedLegs) Teilstrecken betroffen")
+                        .font(.caption2)
+                        .foregroundColor(bannerColor.opacity(0.8))
+                }
             }
+
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.red.opacity(0.1))
+            RoundedRectangle(cornerRadius: 10)
+                .fill(bannerColor.opacity(0.08))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(bannerColor.opacity(0.2), lineWidth: 1)
                 )
         )
     }
-    
-    // MARK: - Enhanced Transport Lines with Destinations
-    
+
+    // MARK: - Transport Lines
+
     @ViewBuilder
-    private var transportLinesWithDestinations: some View {
+    private var transportLinesSection: some View {
+        let timedLegs = trip.legs.filter { $0.isTimedLeg }
+
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(trip.legs.filter { $0.type == "TimedLeg" }) { leg in
+            HStack(spacing: 8) {
+                ForEach(Array(timedLegs.enumerated()), id: \.offset) { index, leg in
                     if let serviceName = leg.serviceName {
-                        VStack(spacing: 6) {
-                            // Line badge
-                            HStack(spacing: 4) {
-                                Image(systemName: getTransportIcon(for: leg.serviceType))
-                                    .font(.caption2)
-                                Text(getShortLineName(from: serviceName))
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(getLineColor(for: leg.serviceType)))
-                            
-                            // Destination with delay indicator
-                            if let destination = leg.destinationLabel {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "arrow.right")
-                                        .font(.system(size: 8))
-                                        .foregroundColor(.secondary)
-                                    
-                                    Text(destination)
-                                        .font(.system(size: 9))
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.secondary)
-                                    
-                                    // Small delay indicator for this leg
-                                    if let legDelay = getLegDelay(leg), legDelay > 0 {
-                                        Text("+\(legDelay)")
-                                            .font(.system(size: 8, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 4)
-                                            .padding(.vertical, 1)
-                                            .background(
-                                                Capsule().fill(Color.red)
-                                            )
-                                    }
-                                }
-                                .lineLimit(1)
-                                .frame(maxWidth: 140)
-                            }
+                        legBadge(leg: leg, serviceName: serviceName)
+
+                        // Arrow between legs
+                        if index < timedLegs.count - 1 {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary.opacity(0.5))
                         }
                     }
                 }
@@ -291,9 +315,65 @@ struct TripCard: View {
             .padding(.horizontal, 2)
         }
     }
-    
+
+    @ViewBuilder
+    private func legBadge(leg: TripLeg, serviceName: String) -> some View {
+        let legDelay = getLegDelay(leg)
+        let isSBahn = TransportIconHelper.isSBahnLine(serviceType: leg.serviceType, serviceName: leg.serviceName)
+        let lineColor = TransportIconHelper.getLineColor(for: leg.serviceType, serviceName: leg.serviceName)
+
+        VStack(spacing: 4) {
+            // Line badge with integrated delay
+            HStack(spacing: 4) {
+                Image(systemName: TransportIconHelper.getTransportIcon(for: leg.serviceType, serviceName: leg.serviceName))
+                    .font(.system(size: isSBahn ? 15 : 10))
+                Text(TransportIconHelper.getShortLineName(from: serviceName))
+                    .font(.caption)
+                    .fontWeight(.bold)
+
+                if let delay = legDelay, delay > 0 {
+                    Text("+\(delay)")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule().fill(isSBahn ? Color.green.opacity(0.15) : Color.white.opacity(0.3))
+                        )
+                }
+            }
+            .foregroundColor(isSBahn ? .green : .white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Group {
+                    if isSBahn {
+                        Capsule()
+                            .fill(Color.white)
+                            .overlay(Capsule().stroke(Color.green, lineWidth: 1.5))
+                    } else {
+                        Capsule().fill(lineColor)
+                            .overlay(
+                                legDelay != nil && legDelay! > 0 ?
+                                Capsule().stroke(Color.red, lineWidth: 1.5) : nil
+                            )
+                    }
+                }
+            )
+
+            // Destination label
+            if let destination = leg.destinationLabel {
+                Text(destination)
+                    .font(.system(size: 9))
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 120)
+            }
+        }
+    }
+
     // MARK: - Live Activity Section
-    
+
     @available(iOS 16.2, *)
     @ViewBuilder
     private var liveActivitySection: some View {
@@ -301,12 +381,12 @@ struct TripCard: View {
             Image(systemName: isLiveActivityActive ? "bell.badge.fill" : "bell")
                 .font(.title3)
                 .foregroundColor(isLiveActivityActive ? .green : .secondary)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text("Live-Verfolgung")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 if isLiveActivityActive {
                     Text("Aktiv mit Echtzeit-Updates")
                         .font(.caption2)
@@ -319,26 +399,31 @@ struct TripCard: View {
                         .lineLimit(1)
                 }
             }
-            
+
             Spacer()
-            
+
             Toggle("", isOn: $isLiveActivityActive)
                 .labelsHidden()
                 .tint(.green)
         }
         .padding(.top, 4)
-        .onChange(of: isLiveActivityActive) { oldValue, newValue in
+        .onChange(of: isLiveActivityActive) { _, newValue in
             handleToggleChange(newValue)
         }
         .onAppear {
             isLiveActivityActive = LiveActivityState.shared.isTripActive(trip.id.uuidString)
-            startStateCheckTimer()
+            didAppear = true
         }
-        .onDisappear {
-            stateCheckTimer?.invalidate()
-            stateCheckTimer = nil
+        .onReceive(NotificationCenter.default.publisher(for: LiveActivityState.activeTripsDidChangeNotification)) { _ in
+            let currentState = LiveActivityState.shared.isTripActive(trip.id.uuidString)
+            if currentState != isLiveActivityActive {
+                #if DEBUG
+                print("🔄 [SYNC] State-Änderung erkannt für Trip \(trip.id): \(currentState)")
+                #endif
+                isLiveActivityActive = currentState
+            }
         }
-        
+
         if let error = liveActivityManager.lastError {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.circle.fill")
@@ -352,46 +437,48 @@ struct TripCard: View {
             .padding(.top, 4)
         }
     }
-    
-    // MARK: - Helper Functions
-    
-    private var hasSignificantDelay: Bool {
-        if let delay = getFirstLegDelay(), delay >= 3 { return true }
-        if let delay = getLastLegDelay(), delay >= 3 { return true }
-        return false
-    }
-    
+
+    // MARK: - Helpers
+
     private func getFirstLegDelay() -> Int? {
-        guard let firstTimedLeg = trip.legs.first(where: { $0.type == "TimedLeg" }),
+        guard let firstTimedLeg = trip.legs.first(where: { $0.isTimedLeg }),
               let scheduled = firstTimedLeg.departureTime,
               let estimated = firstTimedLeg.estimatedDepartureTime else { return nil }
-        
-        return calculateDelay(timetabled: scheduled, estimated: estimated)
+
+        return formatter.calculateDelay(timetabled: scheduled, estimated: estimated)
     }
-    
+
     private func getLastLegDelay() -> Int? {
-        guard let lastTimedLeg = trip.legs.last(where: { $0.type == "TimedLeg" }),
+        guard let lastTimedLeg = trip.legs.last(where: { $0.isTimedLeg }),
               let scheduled = lastTimedLeg.arrivalTime,
               let estimated = lastTimedLeg.estimatedArrivalTime else { return nil }
-        
-        return calculateDelay(timetabled: scheduled, estimated: estimated)
+
+        return formatter.calculateDelay(timetabled: scheduled, estimated: estimated)
     }
-    
+
+    private func getFirstLegEstimatedDeparture() -> String? {
+        return trip.legs.first(where: { $0.isTimedLeg })?.estimatedDepartureTime
+    }
+
+    private func getLastLegEstimatedArrival() -> String? {
+        return trip.legs.last(where: { $0.isTimedLeg })?.estimatedArrivalTime
+    }
+
     private func getMaxDelay() -> Int? {
         let depDelay = getFirstLegDelay() ?? 0
         let arrDelay = getLastLegDelay() ?? 0
         let maxDelay = max(depDelay, arrDelay)
         return maxDelay > 0 ? maxDelay : nil
     }
-    
+
     private func getLegDelay(_ leg: TripLeg) -> Int? {
         if let scheduled = leg.departureTime,
            let estimated = leg.estimatedDepartureTime {
-            return calculateDelay(timetabled: scheduled, estimated: estimated)
+            return formatter.calculateDelay(timetabled: scheduled, estimated: estimated)
         }
         return nil
     }
-    
+
     private func getDelayedLegsCount() -> Int {
         return trip.legs.filter { leg in
             if let delay = getLegDelay(leg), delay > 0 {
@@ -400,126 +487,26 @@ struct TripCard: View {
             return false
         }.count
     }
-    
-    private func getDelayMessage() -> String {
-        let depDelay = getFirstLegDelay() ?? 0
-        let arrDelay = getLastLegDelay() ?? 0
-        let maxDelay = max(depDelay, arrDelay)
-        
-        if maxDelay >= 10 {
-            return "Erhebliche Verspätung: +\(maxDelay) Minuten"
-        } else if maxDelay >= 5 {
-            return "Verspätung: +\(maxDelay) Minuten"
-        } else {
-            return "Geringfügige Verspätung: +\(maxDelay) Minuten"
-        }
-    }
-    
-    private func formatTimeWithDelay(_ isoString: String, delay: Int) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let date = formatter.date(from: isoString) else { return isoString }
-        
-        let delayedDate = date.addingTimeInterval(TimeInterval(delay * 60))
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HH:mm"
-        timeFormatter.timeZone = .current
-        return timeFormatter.string(from: delayedDate)
-    }
-    
+
     private func handleToggleChange(_ newValue: Bool) {
+        guard didAppear else { return }
         Task {
             if newValue {
+                #if DEBUG
                 print("🟢 [UI] Live Activity aktiviert für Trip: \(trip.id)")
+                #endif
                 LiveActivityState.shared.setTripActive(trip.id.uuidString, isActive: true)
-                
-                // ✅ NEU: Trip-Daten speichern für spätere Anzeige
                 TripDataManager.shared.saveTripData(trip)
-                
                 await liveActivityManager.startActivity(for: trip, accessToken: authService.accessToken ?? "")
             } else {
+                #if DEBUG
                 print("🔴 [UI] Live Activity deaktiviert für Trip: \(trip.id)")
+                #endif
                 LiveActivityState.shared.setTripActive(trip.id.uuidString, isActive: false)
-                
-                // ✅ NEU: Trip-Daten entfernen
                 TripDataManager.shared.removeTripData(for: trip.id.uuidString)
-                
                 await liveActivityManager.endActivity(tripId: trip.id.uuidString)
             }
         }
     }
-    
-    private func startStateCheckTimer() {
-        stateCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            let currentState = LiveActivityState.shared.isTripActive(trip.id.uuidString)
-            if currentState != isLiveActivityActive {
-                print("🔄 [SYNC] State von Widget erkannt: \(currentState)")
-                isLiveActivityActive = currentState
-            }
-        }
-    }
-    
-    private func formatTime(_ isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        if let date = formatter.date(from: isoString) {
-            let timeFormatter = DateFormatter()
-            timeFormatter.dateFormat = "HH:mm"
-            timeFormatter.timeZone = .current
-            return timeFormatter.string(from: date)
-        }
-        return isoString
-    }
-    
-    private func calculateDuration(start: String, end: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let startDate = formatter.date(from: start),
-              let endDate = formatter.date(from: end) else { return "?" }
-        
-        let duration = endDate.timeIntervalSince(startDate)
-        let minutes = Int(duration / 60)
-        return "\(minutes) min"
-    }
-    
-    private func calculateDelay(timetabled: String, estimated: String) -> Int {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let timetabledDate = formatter.date(from: timetabled),
-              let estimatedDate = formatter.date(from: estimated) else {
-            return 0
-        }
-        
-        let delaySeconds = estimatedDate.timeIntervalSince(timetabledDate)
-        return max(0, Int(delaySeconds / 60))
-    }
-    
-    private func getLineColor(for serviceType: String?) -> Color {
-        switch serviceType {
-        case "STRASSENBAHN": return .red
-        case "BUS": return .blue
-        case "S_BAHN": return .green
-        default: return .gray
-        }
-    }
-    
-    private func getShortLineName(from serviceName: String?) -> String {
-        guard let name = serviceName else { return "?" }
-        return name.replacingOccurrences(of: "RNV ", with: "")
-    }
-    
-    private func getTransportIcon(for serviceType: String?) -> String {
-        switch serviceType {
-        case "STRASSENBAHN": return "tram.fill"
-        case "BUS": return "bus.fill"
-        case "S_BAHN": return "train.side.front.car"
-        default: return "questionmark"
-        }
-    }
-    
-}
 
+}

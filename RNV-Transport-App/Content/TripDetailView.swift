@@ -8,39 +8,40 @@
 import SwiftUI
 import CoreLocation
 
-// MARK: - Enhanced Trip Detail View with Live Activity Toggle
-
 struct TripDetailView: View {
     let trip: DetailedTrip
     let authService: AuthService
-    
-    // Live Activity Management
-    @StateObject private var liveActivityManager = LiveActivityManager()
+
+    @ObservedObject var liveActivityManager: LiveActivityManager
     @State private var isLiveActivityActive = false
-    
+    @State private var didAppear = false
+    @State private var showShareSheet = false
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    
+
+    private let formatter = DateFormattingHelper.shared
+
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Trip Overview Header
                     tripOverviewHeader
-                    
-                    // Live Activity Section
+
                     if #available(iOS 16.2, *) {
                         liveActivityDetailSection
                     }
-                    
-                    // Leg Details
-                    VStack(spacing: 16) {
-                        ForEach(Array(trip.legs.enumerated()), id: \.offset) { index, leg in
-                            LegDetailCard(leg: leg, isLast: index == trip.legs.count - 1)
-                        }
+
+                    // Route-Zusammenfassung
+                    if trip.legs.filter({ $0.isTimedLeg }).count > 1 {
+                        TripRouteSummary(legs: trip.legs)
+                            .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 30)
+
+                    // Zusammenhängende Reise-Timeline
+                    TripJourneyView(legs: trip.legs)
+                        .padding(.horizontal)
+                        .padding(.bottom, 30)
                 }
             }
             .background(Color(colorScheme == .dark ? .black : .systemGroupedBackground))
@@ -48,69 +49,139 @@ struct TripDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                            .font(.title3)
+                    HStack(spacing: 12) {
+                        Button(action: { showShareSheet = true }) {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundColor(AppTheme.primaryColor)
+                                .font(.title3)
+                        }
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.title3)
+                        }
                     }
                 }
-                
-                // Live Activity Toolbar Button
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if #available(iOS 16.2, *) {
+
+                if #available(iOS 16.2, *) {
+                    ToolbarItem(placement: .navigationBarLeading) {
                         Button(action: toggleLiveActivity) {
                             Image(systemName: isLiveActivityActive ? "bell.badge.fill" : "bell")
-                                .foregroundColor(isLiveActivityActive ? .green : .blue)
+                                .foregroundColor(isLiveActivityActive ? .green : AppTheme.primaryColor)
                                 .font(.title3)
                         }
                     }
                 }
             }
         }
+        .sheet(isPresented: $showShareSheet) {
+            let text = generateShareText()
+            ShareSheet(activityItems: [text])
+        }
         .onAppear {
             if #available(iOS 16.2, *) {
                 isLiveActivityActive = LiveActivityState.shared.isTripActive(trip.id.uuidString)
             }
+            didAppear = true
         }
     }
-    
+
     // MARK: - Trip Overview Header
-    
+
     private var tripOverviewHeader: some View {
-        VStack(spacing: 16) {
+        let depDelay = getFirstLegDelay()
+        let arrDelay = getLastLegDelay()
+        let maxDelay = max(depDelay ?? 0, arrDelay ?? 0)
+
+        return VStack(spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        Text(formatTime(trip.startTime))
-                            .font(.system(size: 36, weight: .bold))
-                        
+                        // Departure time with delay
+                        if let delay = depDelay, delay > 0,
+                           let estDep = trip.legs.first(where: { $0.isTimedLeg })?.estimatedDepartureTime {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(formatter.formatTime(trip.startTime))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .strikethrough(true, color: .red.opacity(0.6))
+                                Text(formatter.formatTime(estDep))
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(.red)
+                            }
+                        } else {
+                            Text(formatter.formatTime(trip.startTime))
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
+
                         Image(systemName: "arrow.right")
                             .font(.title3)
                             .foregroundColor(.secondary)
-                        
-                        Text(formatTime(trip.endTime))
-                            .font(.system(size: 36, weight: .bold))
+
+                        // Arrival time with delay
+                        if let delay = arrDelay, delay > 0,
+                           let estArr = trip.legs.last(where: { $0.isTimedLeg })?.estimatedArrivalTime {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(formatter.formatTime(trip.endTime))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .strikethrough(true, color: .red.opacity(0.6))
+                                Text(formatter.formatTime(estArr))
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(.red)
+                            }
+                        } else {
+                            Text(formatter.formatTime(trip.endTime))
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
                     }
-                    .foregroundColor(.primary)
-                    
-                    Text("Fahrtdauer: \(calculateDuration(start: trip.startTime, end: trip.endTime))")
+
+                    Text("Fahrtdauer: \(formatter.calculateDuration(start: trip.startTime, end: trip.endTime))")
                         .font(.headline)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
             }
-            
+
+            // Delay banner
+            if maxDelay >= 2 {
+                HStack(spacing: 8) {
+                    Image(systemName: maxDelay >= 5 ? "exclamationmark.triangle.fill" : "clock.badge.exclamationmark")
+                        .foregroundColor(maxDelay >= 5 ? .red : .orange)
+                        .font(.system(size: 14))
+
+                    Text("Verspätung: +\(maxDelay) Min.")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(maxDelay >= 5 ? .red : .orange)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill((maxDelay >= 5 ? Color.red : Color.orange).opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke((maxDelay >= 5 ? Color.red : Color.orange).opacity(0.2), lineWidth: 1)
+                        )
+                )
+            }
+
             if trip.interchanges > 0 {
-                HStack {
+                HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.swap")
                     Text("\(trip.interchanges) Umstieg\(trip.interchanges == 1 ? "" : "e")")
                 }
                 .font(.subheadline)
-                .foregroundColor(.orange)
+                .foregroundColor(.secondary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Capsule().fill(Color.orange.opacity(0.15)))
+                .background(Capsule().fill(Color(.systemGray5)))
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -123,9 +194,9 @@ struct TripDetailView: View {
         .padding(.horizontal)
         .padding(.top, 20)
     }
-    
+
     // MARK: - Live Activity Detail Section
-    
+
     @available(iOS 16.2, *)
     @ViewBuilder
     private var liveActivityDetailSection: some View {
@@ -135,7 +206,7 @@ struct TripDetailView: View {
                     Text("Live-Verfolgung")
                         .font(.headline)
                         .fontWeight(.semibold)
-                    
+
                     Text(isLiveActivityActive ?
                          "Erhalte Updates auf dem Sperrbildschirm und in der Dynamic Island" :
                          "Aktiviere Live-Updates für diese Verbindung")
@@ -143,58 +214,57 @@ struct TripDetailView: View {
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                
+
                 Spacer()
-                
+
                 Toggle("", isOn: $isLiveActivityActive)
                     .labelsHidden()
                     .tint(.green)
                     .scaleEffect(1.2)
             }
-            
+
             if isLiveActivityActive {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                             .font(.system(size: 16))
-                        
+
                         Text("Live Activity ist aktiv")
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundColor(.green)
-                        
+
                         Spacer()
                     }
-                    
+
                     HStack(spacing: 8) {
                         Image(systemName: "info.circle")
-                            .foregroundColor(.blue)
+                            .foregroundStyle(AppTheme.primaryColor)
                             .font(.system(size: 14))
-                        
+
                         Text("Echtzeit-Updates werden auf dem Sperrbildschirm und in der Dynamic Island angezeigt")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        
+
                         Spacer()
                     }
                 }
                 .padding(.top, 8)
             }
-            
-            // Error Display
+
             if let error = liveActivityManager.lastError {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
                         .font(.system(size: 14))
-                    
+
                     Text(error)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    
+
                     Spacer()
                 }
                 .padding(.top, 4)
@@ -207,191 +277,141 @@ struct TripDetailView: View {
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 6, y: 3)
         )
         .padding(.horizontal)
-        .onChange(of: isLiveActivityActive) { oldValue, newValue in
+        .onChange(of: isLiveActivityActive) { _, newValue in
             handleToggleChange(newValue)
         }
     }
-    
+
     // MARK: - Live Activity Handling
-    
+
     @available(iOS 16.2, *)
     private func toggleLiveActivity() {
         isLiveActivityActive.toggle()
     }
-    
+
+    // MARK: - Delay Helpers
+
+    private func getFirstLegDelay() -> Int? {
+        guard let firstTimedLeg = trip.legs.first(where: { $0.isTimedLeg }),
+              let scheduled = firstTimedLeg.departureTime,
+              let estimated = firstTimedLeg.estimatedDepartureTime else { return nil }
+        return formatter.calculateDelay(timetabled: scheduled, estimated: estimated)
+    }
+
+    private func getLastLegDelay() -> Int? {
+        guard let lastTimedLeg = trip.legs.last(where: { $0.isTimedLeg }),
+              let scheduled = lastTimedLeg.arrivalTime,
+              let estimated = lastTimedLeg.estimatedArrivalTime else { return nil }
+        return formatter.calculateDelay(timetabled: scheduled, estimated: estimated)
+    }
+
+    // MARK: - Share Text Generation
+
+    private func generateShareText() -> String {
+        var text = "🚆 RNV Verbindung\n"
+        text += "\(formatter.formatTime(trip.startTime)) → \(formatter.formatTime(trip.endTime))"
+        text += " (\(formatter.calculateDuration(start: trip.startTime, end: trip.endTime)))\n\n"
+
+        for leg in trip.legs {
+            if leg.isTimedLeg {
+                let name = leg.serviceName ?? "Unbekannt"
+                let from = leg.boardStopName ?? "?"
+                let to = leg.alightStopName ?? "?"
+                let depTime = formatter.formatTime(leg.departureTime ?? "")
+                let arrTime = formatter.formatTime(leg.arrivalTime ?? "")
+                text += "🚏 \(depTime) \(from)\n"
+                text += "   \(name) → \(leg.destinationLabel ?? "")\n"
+                text += "🚏 \(arrTime) \(to)\n\n"
+            } else {
+                let duration = formatter.calculateDuration(start: leg.departureTime ?? "", end: leg.arrivalTime ?? "")
+                text += "🚶 Fußweg (\(duration))\n\n"
+            }
+        }
+
+        if trip.interchanges > 0 {
+            text += "🔄 \(trip.interchanges) Umstieg\(trip.interchanges == 1 ? "" : "e")\n"
+        }
+
+        return text
+    }
+
     @available(iOS 16.2, *)
     private func handleToggleChange(_ newValue: Bool) {
+        guard didAppear else { return }
         Task {
             if newValue {
+                #if DEBUG
                 print("🟢 [DETAIL] Live Activity aktiviert für Trip: \(trip.id)")
+                #endif
                 LiveActivityState.shared.setTripActive(trip.id.uuidString, isActive: true)
+                TripDataManager.shared.saveTripData(trip)
                 await liveActivityManager.startActivity(for: trip, accessToken: authService.accessToken ?? "")
             } else {
+                #if DEBUG
                 print("🔴 [DETAIL] Live Activity deaktiviert für Trip: \(trip.id)")
+                #endif
                 LiveActivityState.shared.setTripActive(trip.id.uuidString, isActive: false)
+                TripDataManager.shared.removeTripData(for: trip.id.uuidString)
                 await liveActivityManager.endActivity(tripId: trip.id.uuidString)
             }
         }
     }
-    
-    // MARK: - Helper Functions
-    
-    private func formatTime(_ isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        if let date = formatter.date(from: isoString) {
-            let timeFormatter = DateFormatter()
-            timeFormatter.dateFormat = "HH:mm"
-            timeFormatter.timeZone = .current
-            return timeFormatter.string(from: date)
-        }
-        return isoString
-    }
-    
-    private func calculateDuration(start: String, end: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let startDate = formatter.date(from: start),
-              let endDate = formatter.date(from: end) else { return "?" }
-        
-        let duration = endDate.timeIntervalSince(startDate)
-        let minutes = Int(duration / 60)
-        return "\(minutes) min"
-    }
 }
 
-// MARK: - Preview
-
 #Preview {
-    // Mock Data für Preview
     let mockTrip = DetailedTrip(
         startTime: "2026-01-18T14:30:00.000Z",
         endTime: "2026-01-18T15:15:00.000Z",
         interchanges: 1,
         legs: [
             TripLeg(
-                type: "TimedLeg",
+                type: .timedLeg,
                 mode: "STRASSENBAHN",
-                boardStopName: "STRASSENBAHN",
-                alightStopName: "RNV 5",
-                departureTime: "Straßenbahn Linie 5 Richtung Heidelberg",
-                arrivalTime: "Heidelberg Hauptbahnhof",
-                estimatedDepartureTime: "Mannheim Hauptbahnhof",
-                estimatedArrivalTime: "Heidelberg Bismarckplatz",
-                serviceType: "2026-01-18T14:30:00.000Z",
-                serviceName: "2026-01-18T14:45:00.000Z",
-                serviceDescription: "2026-01-18T14:33:00.000Z", // 3 Min Verspätung
-                destinationLabel: "2026-01-18T14:48:00.000Z"
+                boardStopName: "Mannheim Hbf",
+                alightStopName: "Heidelberg Bismarckplatz",
+                departureTime: "2026-01-18T14:30:00.000Z",
+                arrivalTime: "2026-01-18T14:45:00.000Z",
+                estimatedDepartureTime: "2026-01-18T14:33:00.000Z",
+                estimatedArrivalTime: "2026-01-18T14:48:00.000Z",
+                serviceType: "STRASSENBAHN",
+                serviceName: "Linie 5",
+                serviceDescription: nil,
+                destinationLabel: "Heidelberg Hauptbahnhof"
             ),
             TripLeg(
-                type: "WALK",
+                type: .continuousLeg,
                 mode: "WALK",
                 boardStopName: nil,
-                alightStopName: "Fußweg",
-                departureTime: "Fußweg zwischen Haltestellen",
-                arrivalTime: nil,
+                alightStopName: nil,
+                departureTime: "2026-01-18T14:45:00.000Z",
+                arrivalTime: "2026-01-18T14:50:00.000Z",
                 estimatedDepartureTime: nil,
                 estimatedArrivalTime: nil,
-                serviceType: "2026-01-18T14:45:00.000Z",
-                serviceName: "2026-01-18T14:50:00.000Z",
+                serviceType: nil,
+                serviceName: "Fußweg",
                 serviceDescription: nil,
                 destinationLabel: nil
             ),
             TripLeg(
-                type: "TimedLeg",
+                type: .timedLeg,
                 mode: "BUS",
-                boardStopName: "BUS",
-                alightStopName: "RNV 33",
-                departureTime: "Bus Linie 33 Richtung Rohrbach",
-                arrivalTime: "Heidelberg Rohrbach",
-                estimatedDepartureTime: "Heidelberg Bismarckplatz",
-                estimatedArrivalTime: "Heidelberg Neuenheimer Feld",
-                serviceType: "2026-01-18T14:50:00.000Z",
-                serviceName: "2026-01-18T15:15:00.000Z",
+                boardStopName: "Heidelberg Bismarckplatz",
+                alightStopName: "Heidelberg Neuenheimer Feld",
+                departureTime: "2026-01-18T14:50:00.000Z",
+                arrivalTime: "2026-01-18T15:15:00.000Z",
+                estimatedDepartureTime: nil,
+                estimatedArrivalTime: nil,
+                serviceType: "BUS",
+                serviceName: "Linie 33",
                 serviceDescription: nil,
-                destinationLabel: nil
+                destinationLabel: "Rohrbach"
             )
         ]
     )
-    
-    let mockAuthService = AuthService()
-    
-    TripDetailView(trip: mockTrip, authService: mockAuthService)
-        .preferredColorScheme(.light)
-}
 
-#Preview("Dark Mode") {
-    // Mock Data für Dark Mode Preview
-    let mockTrip = DetailedTrip(
-        startTime: "2026-01-18T14:30:00.000Z",
-        endTime: "2026-01-18T15:15:00.000Z",
-        interchanges: 2,
-        legs: [
-            TripLeg(
-                type: "TimedLeg",
-                mode: "S_BAHN",
-                boardStopName: "S_BAHN",
-                alightStopName: "S1",
-                departureTime: "S-Bahn S1 Richtung Heidelberg",
-                arrivalTime: "Heidelberg Hauptbahnhof",
-                estimatedDepartureTime: "Mannheim Hauptbahnhof",
-                estimatedArrivalTime: "Weinheim",
-                serviceType: "2026-01-18T14:30:00.000Z",
-                serviceName: "2026-01-18T14:40:00.000Z",
-                serviceDescription: "2026-01-18T14:37:00.000Z", // 7 Min Verspätung
-                destinationLabel: "2026-01-18T14:47:00.000Z"
-            ),
-            TripLeg(
-                type: "TimedLeg",
-                mode: "STRASSENBAHN",
-                boardStopName: "STRASSENBAHN",
-                alightStopName: "RNV 3",
-                departureTime: "Straßenbahn Linie 3 Richtung Universität",
-                arrivalTime: "Heidelberg Universität",
-                estimatedDepartureTime: "Weinheim Hauptbahnhof",
-                estimatedArrivalTime: "Heidelberg Alte Brücke",
-                serviceType: "2026-01-18T14:45:00.000Z",
-                serviceName: "2026-01-18T15:15:00.000Z",
-                serviceDescription: nil,
-                destinationLabel: nil
-            )
-        ]
-    )
-    
     let mockAuthService = AuthService()
-    
-    TripDetailView(trip: mockTrip, authService: mockAuthService)
-        .preferredColorScheme(.dark)
-}
+    let mockManager = LiveActivityManager()
 
-#Preview("Direct Trip") {
-    // Mock Data für direkte Verbindung ohne Umstieg
-    let mockTrip = DetailedTrip(
-        startTime: "2026-01-18T16:00:00.000Z",
-        endTime: "2026-01-18T16:25:00.000Z",
-        interchanges: 0,
-        legs: [
-            TripLeg(
-                type: "TimedLeg",
-                mode: "STRASSENBAHN",
-                boardStopName: "STRASSENBAHN",
-                alightStopName: "RNV 1",
-                departureTime: "Straßenbahn Linie 1 Richtung Schönau",
-                arrivalTime: "Mannheim Schönau",
-                estimatedDepartureTime: "Mannheim Paradeplatz",
-                estimatedArrivalTime: "Mannheim Neckarau",
-                serviceType: "2026-01-18T16:00:00.000Z",
-                serviceName: "2026-01-18T16:25:00.000Z",
-                serviceDescription: nil,
-                destinationLabel: nil
-            )
-        ]
-    )
-    
-    let mockAuthService = AuthService()
-    
-    TripDetailView(trip: mockTrip, authService: mockAuthService)
+    TripDetailView(trip: mockTrip, authService: mockAuthService, liveActivityManager: mockManager)
         .preferredColorScheme(.light)
 }

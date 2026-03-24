@@ -22,7 +22,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
     }
     
-    // ✅ Auto-Request mit Permission-Check
+    // MARK: - Location Requests
+    
     func autoRequestLocation() async {
         await requestPermission()
     }
@@ -34,9 +35,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func startLocationUpdates() {
-        DispatchQueue.main.async {
-            self.isLocating = true
-        }
+        // Synchron setzen – wird immer vom Main-Thread aufgerufen
+        // (entweder direkt oder via DispatchQueue.main.async in locationManagerDidChangeAuthorization)
+        isLocating = true
         locationManager.startUpdatingLocation()
     }
     
@@ -48,16 +49,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         DispatchQueue.main.async {
             self.location = location.coordinate
             self.isLocating = false
+            #if DEBUG
             print("📍 [LOCATION] Standort aktualisiert: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+            #endif
         }
         
         locationManager.stopUpdatingLocation()
     }
     
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
         DispatchQueue.main.async {
             self.authorizationStatus = status
-            
+
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 self.startLocationUpdates()
             }
@@ -65,7 +69,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        #if DEBUG
         print("❌ [LOCATION] Fehler: \(error.localizedDescription)")
+        #endif
         DispatchQueue.main.async {
             self.isLocating = false
         }

@@ -12,22 +12,17 @@ import SwiftUI
 struct RNVLiveActivityLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: TripLiveActivityAttributes.self) { context in
-            
+
             // MARK: Lock Screen Widget
-            TimelineView(.periodic(from: Date(), by: 1.0)) { timeline in
-                ContentMediumView(
-                    context: context,
-                    isBeforeDeparture: DateCalculationHelper.isBeforeDeparture(
-                        context.attributes.departureTimeISO,
-                        at: timeline.date
-                    ),
-                    currentTime: timeline.date
-                )
-            }
+            ContentMediumView(
+                context: context,
+                isBeforeDeparture: context.state.phase == .beforeDeparture,
+                currentTime: Date()
+            )
 
         } dynamicIsland: { context in
             DynamicIsland {
-                
+
                 // MARK: Expanded - Leading
                 DynamicIslandExpandedRegion(.leading) {
                     DynamicIslandExpandedLeading(
@@ -43,12 +38,12 @@ struct RNVLiveActivityLiveActivity: Widget {
                         phase: context.state.phase
                     )
                 }
-                
+
                 // MARK: Expanded - Center
                 DynamicIslandExpandedRegion(.center) {
-                    Spacer().frame(height: 20)
+                    Spacer().frame(height: 16)
                 }
-                
+
                 // MARK: Expanded - Bottom
                 DynamicIslandExpandedRegion(.bottom) {
                     DynamicIslandExpandedBottom(
@@ -57,83 +52,91 @@ struct RNVLiveActivityLiveActivity: Widget {
                         departureTimeISO: context.attributes.departureTimeISO,
                         arrivalTimeISO: context.attributes.arrivalTimeISO,
                         serviceType: context.state.serviceType,
+                        lineName: context.state.lineName,
                         delay: context.state.delay,
                         phase: context.state.phase,
-                        tripId: context.attributes.tripId  // ✅ NEU
+                        tripId: context.attributes.tripId,
+                        currentTime: Date()
                     )
                 }
-                
+
             } compactLeading: {
-                
+
                 // MARK: Compact - Leading
                 DynamicIslandCompactLeading(
                     serviceType: context.state.serviceType,
                     lineName: context.state.lineName
                 )
-                
+
             } compactTrailing: {
-                
+
                 // MARK: Compact - Trailing
-                TimelineView(.periodic(from: Date(), by: 1.0)) { timeline in
-                    DynamicIslandCompactTrailing(
-                        departureTimeISO: context.attributes.departureTimeISO,
-                        arrivalTimeISO: context.attributes.arrivalTimeISO,
-                        delay: context.state.delay,
-                        currentTime: timeline.date,
-                        phase: context.state.phase
-                    )
-                }
-                .animation(.easeInOut(duration: 0.3), value: context.state.phase)
-                
+                DynamicIslandCompactTrailing(
+                    departureTimeISO: context.attributes.departureTimeISO,
+                    arrivalTimeISO: context.attributes.arrivalTimeISO,
+                    delay: context.state.delay,
+                    phase: context.state.phase,
+                    currentTime: Date()
+                )
+
             } minimal: {
-                
+
                 // MARK: Minimal
-                TimelineView(.periodic(from: Date(), by: 1.0)) { timeline in
-                    DynamicIslandMinimalView(
-                        departureTimeISO: context.attributes.departureTimeISO,
-                        serviceType: context.state.serviceType,
-                        delay: context.state.delay,
-                        currentTime: timeline.date,
-                        phase: context.state.phase
-                    )
-                }
-                .animation(.easeInOut(duration: 0.3), value: context.state.phase)
+                DynamicIslandMinimalView(
+                    departureTimeISO: context.attributes.departureTimeISO,
+                    serviceType: context.state.serviceType,
+                    lineName: context.state.lineName,
+                    delay: context.state.delay,
+                    phase: context.state.phase
+                )
             }
-            .keylineTint(StyleHelper.getColor(for: context.state.serviceType))
+            .keylineTint(StyleHelper.getColor(for: context.state.serviceType, serviceName: context.state.lineName))
         }
     }
 }
 
-// ========================================
 // MARK: - Previews
-// ========================================
 
-#Preview("1. Vor Abfahrt (Pünktlich)", as: .dynamicIsland(.compact), using: TripLiveActivityAttributes.previewBeforeDeparture) {
-   RNVLiveActivityLiveActivity()
+#Preview("1. Vor Abfahrt (Pünktlich)", as: .content, using: TripLiveActivityAttributes.previewBeforeDeparture) {
+    RNVLiveActivityLiveActivity()
 } contentStates: {
     TripLiveActivityAttributes.ContentState.onTime
 }
 
-#Preview("2. Vor Abfahrt (Verspätet)", as: .dynamicIsland(.compact), using: TripLiveActivityAttributes.previewBeforeDeparture) {
-   RNVLiveActivityLiveActivity()
+#Preview("2. Vor Abfahrt (Verspätet)", as: .content, using: TripLiveActivityAttributes.previewBeforeDeparture) {
+    RNVLiveActivityLiveActivity()
 } contentStates: {
     TripLiveActivityAttributes.ContentState.delayed
 }
 
-#Preview("3. Während Fahrt (Pünktlich)", as: .dynamicIsland(.compact), using: TripLiveActivityAttributes.previewDuringJourney) {
-   RNVLiveActivityLiveActivity()
+#Preview("3. Während Fahrt", as: .dynamicIsland(.expanded), using: TripLiveActivityAttributes.previewDuringJourney) {
+    RNVLiveActivityLiveActivity()
+} contentStates: {
+    TripLiveActivityAttributes.ContentState.duringJourney
+    TripLiveActivityAttributes.ContentState.duringJourneyDelayed
+}
+
+#Preview("4. Compact (Pünktlich)", as: .dynamicIsland(.compact), using: TripLiveActivityAttributes.previewBeforeDeparture) {
+    RNVLiveActivityLiveActivity()
 } contentStates: {
     TripLiveActivityAttributes.ContentState.onTime
 }
 
-#Preview("4. Während Fahrt (Verspätet)", as: .dynamicIsland(.compact), using: TripLiveActivityAttributes.previewDuringJourney) {
-   RNVLiveActivityLiveActivity()
+#Preview("5. Compact (Verspätet)", as: .dynamicIsland(.compact), using: TripLiveActivityAttributes.previewDuringJourney) {
+    RNVLiveActivityLiveActivity()
 } contentStates: {
-    TripLiveActivityAttributes.ContentState.delayed
+    TripLiveActivityAttributes.ContentState.duringJourneyDelayed
 }
 
-#Preview("5. Angekommen", as: .dynamicIsland(.expanded), using: TripLiveActivityAttributes.previewArrived) {
-   RNVLiveActivityLiveActivity()
+#Preview("6. Angekommen", as: .dynamicIsland(.expanded), using: TripLiveActivityAttributes.previewArrived) {
+    RNVLiveActivityLiveActivity()
 } contentStates: {
     TripLiveActivityAttributes.ContentState.arrived
 }
+#Preview("7. Minimal", as: .dynamicIsland(.minimal), using: TripLiveActivityAttributes.previewBeforeDeparture) {
+    RNVLiveActivityLiveActivity()
+} contentStates: {
+    TripLiveActivityAttributes.ContentState.onTime
+    TripLiveActivityAttributes.ContentState.delayed
+}
+

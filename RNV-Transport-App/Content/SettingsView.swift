@@ -10,8 +10,8 @@ import CoreLocation
 
 struct SettingsView: View {
     @ObservedObject var locationManager: LocationManager
-    @StateObject private var liveActivityManager = LiveActivityManager()
-    
+    @EnvironmentObject var liveActivityManager: LiveActivityManager
+
     @AppStorage("autoStartLiveActivity") private var autoStartLiveActivity = false
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @AppStorage("showDelaysOnly") private var showDelaysOnly = false
@@ -21,18 +21,54 @@ struct SettingsView: View {
     @AppStorage("enableBus") private var enableBus = true
     @AppStorage("enableSBahn") private var enableSBahn = true
     @AppStorage("developerMode") private var developerMode = false
-    
+
     @State private var showingResetAlert = false
     @State private var showingCleanupSuccess = false
-    
+
     var body: some View {
         NavigationView {
             Form {
-                // MARK: - Standort
+                // MARK: - About Section (NEU – ganz oben)
+                Section {
+                    VStack(spacing: 12) {
+                        HStack(spacing: 16) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(AppTheme.accentGradient)
+                                    .frame(width: 64, height: 64)
+
+                                Image(systemName: "tram.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.white)
+                                    .symbolRenderingMode(.hierarchical)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("ÖPNV Mannheim")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+
+                                Text("Mannheim & Umgebung")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+
+                        Text("Dies ist ein unabhängiges Studentenprojekt und steht in keiner Verbindung zur rnv GmbH oder anderen Verkehrsbetrieben. Die App nutzt ausschließlich öffentlich zugängliche Fahrplandaten für den Raum Mannheim und Umgebung.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 8)
+                }
+
+                // MARK: - Location Section
                 Section {
                     HStack {
                         Image(systemName: "location.fill")
-                            .foregroundColor(.blue)
+                            .foregroundStyle(AppTheme.primaryColor)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Aktueller Standort")
                                 .font(.subheadline)
@@ -54,18 +90,20 @@ struct SettingsView: View {
                                 locationManager.startLocationUpdates()
                             }) {
                                 Image(systemName: "arrow.clockwise.circle.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundStyle(AppTheme.primaryColor)
                             }
                         }
                     }
                 } header: {
                     Label("Standort", systemImage: "location.circle")
                 }
-                
-                // MARK: - Live Activity
+
+                // MARK: - Live Activity Section
                 Section {
                     Toggle("Live-Verfolgung automatisch starten", isOn: $autoStartLiveActivity)
+                        .tint(AppTheme.primaryColor)
                     Toggle("Push-Benachrichtigungen", isOn: $notificationsEnabled)
+                        .tint(AppTheme.primaryColor)
                 } header: {
                     Label("Live Activity", systemImage: "bell.badge")
                 } footer: {
@@ -73,11 +111,12 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
-                // MARK: - Verbindungssuche
+
+                // MARK: - Search Section
                 Section {
                     Toggle("Nur verspätete Verbindungen", isOn: $showDelaysOnly)
-                    
+                        .tint(AppTheme.primaryColor)
+
                     Stepper(value: $maxConnections, in: 3...10) {
                         HStack {
                             Text("Max. Verbindungen")
@@ -86,18 +125,18 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Suchradius: \(String(format: "%.1f", defaultSearchRadius)) km")
                             .font(.subheadline)
                         Slider(value: $defaultSearchRadius, in: 0.5...5.0, step: 0.5)
-                            .tint(.blue)
+                            .tint(AppTheme.primaryColor)
                     }
                 } header: {
                     Label("Verbindungssuche", systemImage: "magnifyingglass")
                 }
-                
-                // MARK: - Verkehrsmittel
+
+                // MARK: - Transport Modes
                 Section {
                     Toggle(isOn: $enableTram) {
                         HStack {
@@ -106,7 +145,8 @@ struct SettingsView: View {
                             Text("Straßenbahn")
                         }
                     }
-                    
+                    .tint(AppTheme.primaryColor)
+
                     Toggle(isOn: $enableBus) {
                         HStack {
                             Image(systemName: "bus.fill")
@@ -114,7 +154,8 @@ struct SettingsView: View {
                             Text("Bus")
                         }
                     }
-                    
+                    .tint(AppTheme.primaryColor)
+
                     Toggle(isOn: $enableSBahn) {
                         HStack {
                             Image(systemName: "train.side.front.car")
@@ -122,6 +163,7 @@ struct SettingsView: View {
                             Text("S-Bahn")
                         }
                     }
+                    .tint(AppTheme.primaryColor)
                 } header: {
                     Label("Verkehrsmittel", systemImage: "bus.fill")
                 } footer: {
@@ -129,8 +171,8 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
-                // MARK: - Datenverwaltung
+
+                // MARK: - Data Management
                 Section {
                     Button(role: .destructive, action: {
                         showingResetAlert = true
@@ -140,7 +182,7 @@ struct SettingsView: View {
                             Text("Alle Live Activities beenden")
                         }
                     }
-                    
+
                     Button(action: {
                         Task {
                             await cleanupAllActivities()
@@ -148,7 +190,7 @@ struct SettingsView: View {
                     }) {
                         HStack {
                             Image(systemName: "arrow.clockwise.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundStyle(AppTheme.primaryColor)
                             Text("Cache leeren")
                                 .foregroundColor(.primary)
                         }
@@ -160,11 +202,12 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
-                // MARK: - Entwickler
+
+                // MARK: - Developer Section
                 Section {
                     Toggle("Entwicklermodus", isOn: $developerMode)
-                    
+                        .tint(AppTheme.primaryColor)
+
                     if developerMode {
                         Button(action: {
                             locationManager.location = CLLocationCoordinate2D(
@@ -184,7 +227,7 @@ struct SettingsView: View {
                                 }
                             }
                         }
-                        
+
                         Button(action: {
                             locationManager.location = CLLocationCoordinate2D(
                                 latitude: 49.4044,
@@ -203,43 +246,69 @@ struct SettingsView: View {
                                 }
                             }
                         }
+
+                        Button(action: {
+                            LiveActivityState.shared.debugPrintState()
+                        }) {
+                            HStack {
+                                Image(systemName: "ant.fill")
+                                    .foregroundColor(.red)
+                                Text("Debug: State ausdrucken")
+                                    .foregroundColor(.primary)
+                            }
+                        }
                     }
                 } header: {
                     Label("Entwickler", systemImage: "hammer.fill")
                 } footer: {
                     if developerMode {
-                        Text("Test-Koordinaten für Entwicklung ohne GPS-Zugriff.")
+                        Text("Test-Koordinaten und Debug-Tools für Entwicklung.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
-                
-                // MARK: - Info
+
+                // MARK: - App Info
                 Section {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text("1.1.0")
                             .foregroundColor(.secondary)
                     }
-                    
+
                     HStack {
                         Text("Build")
                         Spacer()
-                        Text("2025.01")
+                        Text("2025.01.20")
                             .foregroundColor(.secondary)
                     }
-                    
-                    Link(destination: URL(string: "https://www.rnv-online.de")!) {
-                        HStack {
-                            Text("RNV Website")
-                            Spacer()
-                            Image(systemName: "arrow.up.forward.circle")
-                                .foregroundColor(.blue)
-                        }
+
+                    HStack {
+                        Text("Datenquelle")
+                        Spacer()
+                        Text("Öffentliche ÖPNV-Daten")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Text("Region")
+                        Spacer()
+                        Text("Mannheim & Umgebung")
+                            .foregroundColor(.secondary)
                     }
                 } header: {
                     Label("App-Info", systemImage: "info.circle")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Studentenprojekt – Keine offizielle App eines Verkehrsunternehmens.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Text("Alle Fahrplandaten stammen aus öffentlich zugänglichen Schnittstellen. Für die Richtigkeit der Daten wird keine Gewähr übernommen.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.8))
+                    }
                 }
             }
             .navigationTitle("Einstellungen")
@@ -262,17 +331,22 @@ struct SettingsView: View {
             }
         }
     }
-    
+
     private func cleanupAllActivities() async {
         if #available(iOS 16.2, *) {
+            #if DEBUG
             print("🗑️ [SETTINGS] Starte komplettes Cleanup...")
+            #endif
             await liveActivityManager.endAllActivitiesAndResetToggles()
             LiveActivityState.shared.deactivateAllTrips()
+            #if DEBUG
             print("✅ [SETTINGS] Cleanup abgeschlossen")
+            #endif
         }
     }
 }
 
 #Preview {
     SettingsView(locationManager: LocationManager())
+        .environmentObject(LiveActivityManager())
 }

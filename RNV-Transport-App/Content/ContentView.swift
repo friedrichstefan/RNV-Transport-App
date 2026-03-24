@@ -10,14 +10,24 @@ import CoreLocation
 
 struct ContentView: View {
     @StateObject private var authService = AuthService()
-    @StateObject private var graphQLService = SecureGraphQLService() // ✅ Sicherer Service
+    @StateObject private var graphQLService = GraphQLService()
     @StateObject private var locationManager = LocationManager()
-    
+
     @State private var activeTripCount = 0
-    
+    @State private var selectedTab = 0
+
+    init() {
+        // UITabBar Appearance einmalig konfigurieren (nicht bei jedem onAppear)
+        let tabBarAppearance = UITabBarAppearance()
+        tabBarAppearance.configureWithDefaultBackground()
+        tabBarAppearance.backgroundEffect = UIBlurEffect(style: .systemThinMaterial)
+        UITabBar.appearance().standardAppearance = tabBarAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+    }
+
     var body: some View {
-        TabView {
-            // MARK: - Verbindungen Tab
+        TabView(selection: $selectedTab) {
+            // MARK: - Connections Tab
             ConnectionsView(
                 authService: authService,
                 graphQLService: graphQLService,
@@ -26,92 +36,69 @@ struct ContentView: View {
             .tabItem {
                 Label("Verbindungen", systemImage: "tram.fill")
             }
-            
-            // MARK: - Geplante Fahrten Tab
+            .tag(0)
+
+            // MARK: - Planned Trips Tab
             PlannedTripsView()
                 .tabItem {
-                    Label("Geplante Fahrten", systemImage: activeTripCount > 0 ? "bell.badge.fill" : "bell.badge")
+                    Label("Fahrten", systemImage: activeTripCount > 0 ? "bell.badge.fill" : "bell")
                 }
-            
-            // MARK: - Einstellungen Tab
+                .tag(1)
+                .badge(activeTripCount > 0 ? activeTripCount : 0)
+
+            // MARK: - Settings Tab
             SettingsView(locationManager: locationManager)
                 .tabItem {
                     Label("Einstellungen", systemImage: "gearshape.fill")
                 }
+                .tag(2)
         }
+        .tint(AppTheme.primaryColor)
         .onAppear {
-            // ✅ xcconfig Validierung
+            #if DEBUG
             print("🔍 [xcconfig] CLIENT_ID: \(Bundle.main.object(forInfoDictionaryKey: "RNV_CLIENT_ID") ?? "❌ NIL")")
             print("🔍 [xcconfig] GRAPHQL_URL: \(Bundle.main.object(forInfoDictionaryKey: "RNV_GRAPHQL_URL") ?? "❌ NIL")")
-            
-            updateActiveTripCount()
-            
-            // Certificate Pinning Setup (nur beim ersten Start)
-            #if DEBUG
-            graphQLService.setupCertificatePinning()
             #endif
-            
-            Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
-                updateActiveTripCount()
-            }
+            // Initialen Trip-Count laden
+            activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LiveActivityState.activeTripsDidChangeNotification)) { _ in
+            activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
         }
         .task {
             await authService.autoAuthenticate()
             await locationManager.autoRequestLocation()
         }
-    }
-    
-    private func updateActiveTripCount() {
-        activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
-    }
-    
-    private func validateConfiguration() {
-        #if DEBUG
-        print("🔍 [SECURITY] Starte Konfigurationsvalidierung...")
-        
-        let requiredKeys = [
-            "RNV_CLIENT_ID",
-            "RNV_CLIENT_SECRET",
-            "RNV_TENANT_ID",
-            "RNV_RESOURCE",
-            "RNV_GRAPHQL_URL"
-        ]
-        
-        var missingKeys: [String] = []
-        
-        for key in requiredKeys {
-            if let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-               !value.isEmpty {
-                print("✅ [CONFIG] \(key): Konfiguriert")
-            } else {
-                print("❌ [CONFIG] \(key): FEHLT!")
-                missingKeys.append(key)
-            }
+        .task(id: "dailyCleanup") {
+            // Einmaliger Cleanup beim Start – keine Endlosschleife nötig
+            TripDataManager.shared.removeExpiredTrips()
         }
-        
-        if !missingKeys.isEmpty {
-            let errorMessage = """
-            🚨 CONFIGURATION FEHLER:
-            
-            Folgende Keys sind nicht konfiguriert:
-            \(missingKeys.joined(separator: "\n"))
-            
-            Lösung:
-            1. Erstelle Config.xcconfig aus Template.xcconfig
-            2. Fülle alle RNV Credentials aus
-            3. Baue die App neu
-            """
-            
-            print(errorMessage)
-            assertionFailure("Konfiguration unvollständig!")
-        } else {
-            print("✅ [SECURITY] Alle Konfigurationen sind vollständig")
-        }
-        #endif
     }
-    
+}
+
+// MARK: - App Theme
+
+struct AppTheme {
+    static let primaryColor = Color(red: 0.0, green: 0.55, blue: 0.65)
+    static let secondaryColor = Color(red: 0.30, green: 0.25, blue: 0.65)
+    static let accentGradient = LinearGradient(
+        colors: [primaryColor, secondaryColor],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    static let headerBackground = LinearGradient(
+        colors: [
+            Color(red: 0.04, green: 0.08, blue: 0.18),
+            Color(red: 0.0, green: 0.32, blue: 0.40)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    static let cardBackground = Color(.systemBackground)
+    static let subtleBackground = Color(.secondarySystemGroupedBackground)
 }
 
 #Preview {
     ContentView()
+        .environmentObject(LiveActivityManager())
 }
