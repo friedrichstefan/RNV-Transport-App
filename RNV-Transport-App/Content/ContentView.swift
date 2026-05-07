@@ -71,6 +71,9 @@ struct ContentView: View {
             #endif
             // Initialen Trip-Count laden
             activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
+            // Watch-Konnektivität mit Services verknüpfen
+            PhoneConnectivityManager.shared.graphQLService = graphQLService
+            PhoneConnectivityManager.shared.authService = authService
         }
         .onReceive(NotificationCenter.default.publisher(for: LiveActivityState.activeTripsDidChangeNotification)) { _ in
             activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
