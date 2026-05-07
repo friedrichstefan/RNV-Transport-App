@@ -195,6 +195,8 @@ struct TransitMapViewRepresentable: View {
     var bottomInset: CGFloat = 220
     var realisticElevation: Bool = false
     var mapScope: Namespace.ID? = nil
+    var selectedStopName: String? = nil
+    var onStopSelected: ((String) -> Void)? = nil
 
     private let routeColor = Color(red: 0.25, green: 0.55, blue: 1.0)
 
@@ -244,11 +246,25 @@ struct TransitMapViewRepresentable: View {
         }
         // Small dots for intermediate stops within each leg
         ForEach(intermediateStopItems, id: \.self) { item in
-            Annotation("", coordinate: item.placemark.coordinate, anchor: .center) {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 8, height: 8)
-                    .overlay(Circle().strokeBorder(routeColor, lineWidth: 2))
+            let isSelected = selectedStopName == item.name
+            Annotation("", coordinate: item.placemark.coordinate, anchor: isSelected ? .bottom : .center) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                        onStopSelected?(isSelected ? "" : (item.name ?? ""))
+                    }
+                } label: {
+                    if isSelected {
+                        intermediateStopPin(name: item.name ?? "")
+                    } else {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 8, height: 8)
+                            .overlay(Circle().strokeBorder(routeColor, lineWidth: 2))
+                            .padding(10)
+                            .contentShape(Rectangle())
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
         if !mergedCoordinates.isEmpty {
@@ -281,6 +297,33 @@ struct TransitMapViewRepresentable: View {
                 .font(.system(size: iconSize))
         }
     }
+
+    @ViewBuilder
+    private func intermediateStopPin(name: String) -> some View {
+        VStack(spacing: 0) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(routeColor)
+                    .shadow(color: routeColor.opacity(0.45), radius: 5, y: 3)
+                HStack(spacing: 5) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(name)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+            }
+            .fixedSize()
+
+            DownwardTriangle()
+                .fill(routeColor)
+                .frame(width: 10, height: 6)
+        }
+    }
 }
 
 // MARK: - Full Map Sheet
@@ -292,6 +335,7 @@ struct FullMapView: View {
 
     @Namespace private var mapScope
     @State private var panelHeight: CGFloat = 160
+    @State private var selectedStopName: String? = nil
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -304,7 +348,13 @@ struct FullMapView: View {
                 transitPolylines: mapVM.transitPolylines,
                 bottomInset: 160,
                 realisticElevation: true,
-                mapScope: mapScope
+                mapScope: mapScope,
+                selectedStopName: selectedStopName,
+                onStopSelected: { name in
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                        selectedStopName = name.isEmpty ? nil : name
+                    }
+                }
             )
             .ignoresSafeArea()
 
@@ -341,8 +391,14 @@ struct FullMapView: View {
                 Spacer()
             }
 
-            RouteStopsPanel(legs: legs, panelHeight: $panelHeight)
+            RouteStopsPanel(legs: legs, panelHeight: $panelHeight, selectedStopName: selectedStopName)
         }
+        .simultaneousGesture(TapGesture().onEnded {
+            guard selectedStopName != nil else { return }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                selectedStopName = nil
+            }
+        })
         .mapScope(mapScope)
         .ignoresSafeArea()
     }
@@ -362,9 +418,11 @@ private enum PanelPosition { case peek, collapsed, expanded }
 struct RouteStopsPanel: View {
     let legs: [TripLeg]
     @Binding var panelHeight: CGFloat
+    var selectedStopName: String? = nil
 
     @State private var position: PanelPosition = .collapsed
     @State private var dragOffset: CGFloat = 0
+    @State private var scrollTarget: String? = nil
     private let formatter = DateFormattingHelper.shared
 
     private let peekHeight: CGFloat      = 28
@@ -441,6 +499,17 @@ struct RouteStopsPanel: View {
                     }
                 }
         )
+        .onChange(of: selectedStopName) { _, name in
+            guard let name, !name.isEmpty else { return }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
+                position = .expanded
+                dragOffset = 0
+                panelHeight = expandedHeight
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                scrollTarget = name
+            }
+        }
     }
 
     // MARK: Drag Handle
@@ -519,14 +588,22 @@ struct RouteStopsPanel: View {
         guard stops.count >= 2 else { return AnyView(EmptyView()) }
 
         return AnyView(
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    ForEach(Array(stops.enumerated()), id: \.offset) { i, stop in
-                        stopRow(stop, isFirst: i == 0, isLast: i == stops.count - 1)
-                            .padding(.horizontal, 4)
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(stops.enumerated()), id: \.offset) { i, stop in
+                            stopRow(stop, isFirst: i == 0, isLast: i == stops.count - 1)
+                                .padding(.horizontal, 4)
+                                .id(stop.name)
+                        }
                     }
+                    .padding(.bottom, 16)
                 }
-                .padding(.bottom, 16)
+                .onChange(of: scrollTarget) { _, target in
+                    guard let target else { return }
+                    withAnimation { proxy.scrollTo(target, anchor: .center) }
+                    scrollTarget = nil
+                }
             }
         )
     }
@@ -535,55 +612,79 @@ struct RouteStopsPanel: View {
 
     @ViewBuilder
     private func stopRow(_ stop: RouteStopEntry, isFirst: Bool = false, isLast: Bool = false) -> some View {
+        let isHighlighted = selectedStopName == stop.name
+        let accentColor = Color(red: 0.25, green: 0.55, blue: 1.0)
+
         HStack(alignment: .center, spacing: 0) {
+            // Left accent bar for highlighted intermediate stop
+            Rectangle()
+                .fill(isHighlighted ? accentColor : Color.clear)
+                .frame(width: 3)
+                .frame(maxHeight: .infinity)
+                .padding(.vertical, 4)
+
             ZStack {
                 VStack(spacing: 0) {
                     Rectangle()
-                        .fill(Color.secondary.opacity(isFirst ? 0 : 0.22))
+                        .fill(isHighlighted
+                              ? accentColor.opacity(0.5)
+                              : Color.secondary.opacity(isFirst ? 0 : 0.22))
                         .frame(width: 2)
                         .frame(maxHeight: .infinity)
                     Rectangle()
-                        .fill(Color.secondary.opacity(isLast ? 0 : 0.22))
+                        .fill(isHighlighted
+                              ? accentColor.opacity(0.5)
+                              : Color.secondary.opacity(isLast ? 0 : 0.22))
                         .frame(width: 2)
                         .frame(maxHeight: .infinity)
                 }
-                dotView(for: stop)
+                dotView(for: stop, highlighted: isHighlighted)
             }
             .frame(width: 20)
-            .padding(.leading, 12)
+            .padding(.leading, 9)
 
             HStack {
                 Text(stop.name)
-                    .font(stop.kind == .intermediate ? .caption : .subheadline)
-                    .fontWeight(stop.kind == .intermediate ? .regular : .medium)
-                    .foregroundColor(stop.kind == .intermediate ? .secondary : .primary)
+                    .font(isHighlighted || stop.kind != .intermediate ? .subheadline : .caption)
+                    .fontWeight(isHighlighted || stop.kind != .intermediate ? .semibold : .regular)
+                    .foregroundColor(isHighlighted ? accentColor : (stop.kind == .intermediate ? .secondary : .primary))
                     .lineLimit(1)
                 Spacer()
                 if let time = stop.time {
                     Text(formatter.formatTime(time))
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isHighlighted ? accentColor : .secondary)
                         .monospacedDigit()
                 }
             }
             .padding(.leading, 12)
             .padding(.trailing, 12)
-            .padding(.vertical, 9)
+            .padding(.vertical, isHighlighted ? 11 : 9)
         }
         .fixedSize(horizontal: false, vertical: true)
+        .background(isHighlighted ? accentColor.opacity(0.07) : Color.clear)
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isHighlighted)
     }
 
     @ViewBuilder
-    private func dotView(for stop: RouteStopEntry) -> some View {
+    private func dotView(for stop: RouteStopEntry, highlighted: Bool = false) -> some View {
+        let accentColor = Color(red: 0.25, green: 0.55, blue: 1.0)
         switch stop.kind {
         case .origin:
             Circle().fill(Color.green).frame(width: 12, height: 12)
         case .destination:
-            Circle().fill(Color(red: 0.25, green: 0.55, blue: 1.0)).frame(width: 12, height: 12)
+            Circle().fill(accentColor).frame(width: 12, height: 12)
         case .transfer:
             Circle().fill(Color.orange).frame(width: 10, height: 10)
         case .intermediate:
-            Circle().fill(Color.secondary.opacity(0.4)).frame(width: 7, height: 7)
+            if highlighted {
+                Circle()
+                    .fill(accentColor)
+                    .frame(width: 10, height: 10)
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+            } else {
+                Circle().fill(Color.secondary.opacity(0.4)).frame(width: 7, height: 7)
+            }
         }
     }
 
@@ -619,5 +720,16 @@ struct RouteStopsPanel: View {
         }
 
         return result
+    }
+}
+
+private struct DownwardTriangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        p.closeSubpath()
+        return p
     }
 }

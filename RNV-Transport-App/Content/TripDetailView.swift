@@ -268,11 +268,15 @@ struct TripDetailView: View {
                         HStack {
                             Spacer()
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(7)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .padding(10)
+                                .padding(9)
+                                .background(
+                                    Circle()
+                                        .fill(Color(red: 0.25, green: 0.55, blue: 1.0).opacity(0.85))
+                                        .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+                                )
+                                .padding(12)
                         }
                         Spacer()
                     }
