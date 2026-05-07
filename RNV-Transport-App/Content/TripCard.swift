@@ -76,8 +76,22 @@ struct TripCard: View {
             radius: isPast ? 4 : 8,
             y: isPast ? 1 : 4
         )
-        .opacity(isPast ? 0.58 : 1.0)
+        .opacity(isPast ? 0.72 : 1.0)
         .padding(.horizontal)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        let dep = formatter.formatTime(trip.startTime)
+        let arr = formatter.formatTime(trip.endTime)
+        let lineNames = timedLegs.compactMap { $0.serviceName }.joined(separator: ", ")
+        var desc = "Verbindung \(dep) bis \(arr)"
+        if !lineNames.isEmpty { desc += ", Linien: \(lineNames)" }
+        if trip.interchanges == 0 { desc += ", direkt" } else { desc += ", \(trip.interchanges) Umstieg(e)" }
+        if let delay = maxDelay, delay > 0 { desc += ", \(delay) Minuten Verspätung" }
+        if isPast { desc += ", bereits abgefahren" }
+        return desc
     }
 
     // MARK: - Time Row

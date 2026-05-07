@@ -47,11 +47,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct RNV_Transport_AppApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var liveActivityManager = LiveActivityManager()
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(liveActivityManager)
+            if hasSeenOnboarding {
+                ContentView()
+                    .environmentObject(liveActivityManager)
+            } else {
+                OnboardingView(hasSeenOnboarding: $hasSeenOnboarding)
+            }
         }
     }
 }

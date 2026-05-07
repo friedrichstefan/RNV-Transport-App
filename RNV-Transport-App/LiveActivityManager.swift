@@ -418,6 +418,15 @@ class LiveActivityManager: ObservableObject {
               let serviceName = currentLeg.serviceName,
               let serviceType = currentLeg.serviceType,
               let destination = currentLeg.destinationLabel else {
+            let tripId = trip.id.uuidString
+            updateTimers[tripId]?.invalidate()
+            let retryTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { [weak self] _ in
+                Task { @MainActor in
+                    await self?.fetchAndUpdateLiveActivity(trip: trip)
+                }
+            }
+            RunLoop.main.add(retryTimer, forMode: .common)
+            updateTimers[tripId] = retryTimer
             return
         }
         

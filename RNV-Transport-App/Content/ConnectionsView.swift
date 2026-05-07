@@ -35,6 +35,7 @@ struct ConnectionsView: View {
     @State private var headerAppeared = false
     @State private var sameStationValidationError = false
 
+    @ObservedObject private var network = NetworkMonitor.shared
     @Environment(\.colorScheme) private var colorScheme
 
     private let formatter = DateFormattingHelper.shared
@@ -84,6 +85,28 @@ struct ConnectionsView: View {
 
                 collapsingHeader
                     .zIndex(1)
+
+                if !network.isConnected {
+                    VStack {
+                        Spacer().frame(height: currentHeaderHeight)
+                        HStack(spacing: 8) {
+                            Image(systemName: "wifi.slash")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text("Kein Internet")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 9)
+                        .background(Color.orange)
+                        Spacer()
+                    }
+                    .zIndex(2)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: network.isConnected)
+                }
             }
             .background(
                 AppTheme.canvasAdaptive(colorScheme)
@@ -95,7 +118,8 @@ struct ConnectionsView: View {
                     authService: authService,
                     graphQLService: graphQLService,
                     locationManager: locationManager,
-                    selectedStation: isPickingStartStation ? $selectedStartStation : $selectedEndStation
+                    selectedStation: isPickingStartStation ? $selectedStartStation : $selectedEndStation,
+                    selectedDate: $selectedDateTime
                 )
             }
             .onChange(of: selectedStartStation) { sameStationValidationError = false }
@@ -233,7 +257,7 @@ struct ConnectionsView: View {
                             .background(Circle().fill(AppTheme.surfaceStrongAdaptive(colorScheme)))
                     }
                     .disabled(selectedStartStation == nil && selectedEndStation == nil)
-                    .opacity((selectedStartStation == nil && selectedEndStation == nil) ? 0.3 : 1.0)
+                    .accessibilityLabel("Start und Ziel tauschen")
                     AppTheme.hairlineAdaptive(colorScheme).frame(height: 1)
                 }
                 .padding(.horizontal, 14)
@@ -287,6 +311,7 @@ struct ConnectionsView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(station.map { "\(placeholder): \($0.longName). Tippen zum Ändern." } ?? "\(placeholder). Tippen zum Auswählen.")
     }
 
     // MARK: - Collapsed Header Content
@@ -668,9 +693,13 @@ struct ConnectionsView: View {
 
     // MARK: - Search Logic
 
+    private func resolveStations() -> (Station, Station)? {
+        guard let start = selectedStartStation, let end = selectedEndStation else { return nil }
+        return (start, end)
+    }
+
     private func searchConnections() async {
-        guard let startStation = selectedStartStation,
-              let endStation = selectedEndStation else { return }
+        guard let (startStation, endStation) = resolveStations() else { return }
 
         if startStation.globalID == endStation.globalID {
             sameStationValidationError = true
@@ -694,8 +723,7 @@ struct ConnectionsView: View {
     }
 
     private func loadEarlierConnections() async {
-        guard let startStation = selectedStartStation,
-              let endStation = selectedEndStation else { return }
+        guard let (startStation, endStation) = resolveStations() else { return }
         if !authService.isTokenValid { await authService.autoAuthenticate() }
         guard let token = authService.accessToken, !token.isEmpty else { return }
 
@@ -718,8 +746,7 @@ struct ConnectionsView: View {
     }
 
     private func loadLaterConnections() async {
-        guard let startStation = selectedStartStation,
-              let endStation = selectedEndStation else { return }
+        guard let (startStation, endStation) = resolveStations() else { return }
         if !authService.isTokenValid { await authService.autoAuthenticate() }
         guard let token = authService.accessToken, !token.isEmpty else { return }
 

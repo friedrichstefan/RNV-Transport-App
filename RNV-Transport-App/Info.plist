@@ -34,6 +34,10 @@
 	<string>$(RNV_SIGNING_KEY)</string>
 	<key>RNV_TENANT_ID</key>
 	<string>$(RNV_TENANT_ID)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ÖPNV Mannheim nutzt deinen Standort, um Haltestellen in deiner Nähe zu finden und dir passende Verbindungen anzuzeigen.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ÖPNV Mannheim nutzt deinen Standort, um Haltestellen in deiner Nähe zu finden und dir passende Verbindungen anzuzeigen.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

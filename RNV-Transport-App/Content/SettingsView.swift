@@ -25,6 +25,7 @@ struct SettingsView: View {
 
     @State private var showingResetAlert = false
     @State private var showingCleanupSuccess = false
+    @State private var showPrivacyPolicy = false
 
     private var cardBg: Color { AppTheme.surfaceCardAdaptive(colorScheme) }
     private var canvasBg: Color { AppTheme.canvasAdaptive(colorScheme) }
@@ -40,6 +41,7 @@ struct SettingsView: View {
                     notificationSection
                     locationSection
                     dataSection
+                    privacySection
                     if developerMode { developerSection }
                     footerSection
                     developerToggleRow
@@ -67,10 +69,26 @@ struct SettingsView: View {
             } message: {
                 Text("Alle Live Activities wurden beendet.")
             }
+            .sheet(isPresented: $showPrivacyPolicy) {
+                PrivacyPolicyView()
+            }
         }
     }
 
-    // MARK: - App Header
+    // MARK: - Privacy Section
+
+    private var privacySection: some View {
+        SettingsCard(title: "Datenschutz", icon: "lock.shield.fill", iconColor: .blue, cardBg: cardBg, dividerColor: dividerColor) {
+            ActionRow(
+                title: "Datenschutzerklärung",
+                icon: "doc.text.fill",
+                iconColor: .blue,
+                inkColor: AppTheme.inkAdaptive(colorScheme)
+            ) {
+                showPrivacyPolicy = true
+            }
+        }
+    }
 
     private var appHeader: some View {
         HStack(spacing: 16) {
@@ -206,6 +224,11 @@ struct SettingsView: View {
                         Text("\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))")
                             .font(.caption.monospacedDigit())
                             .foregroundColor(AppTheme.muted)
+                        if developerMode {
+                            Text("Teststandort aktiv")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.orange)
+                        }
                     } else {
                         Text("Nicht verfügbar")
                             .font(.caption)

@@ -13,6 +13,7 @@ struct StationPickerView: View {
     @ObservedObject var graphQLService: GraphQLService
     @ObservedObject var locationManager: LocationManager
     @Binding var selectedStation: Station?
+    @Binding var selectedDate: Date
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -159,6 +160,9 @@ struct StationPickerView: View {
     private var quickActionsView: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // Datum & Uhrzeit
+                dateTimeSection
+
                 // Standort-Button
                 if locationManager.location != nil {
                     Button(action: loadNearbyStations) {
@@ -253,6 +257,47 @@ struct StationPickerView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
+        }
+    }
+
+    // MARK: - Date & Time Section
+
+    private var dateTimeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar.clock")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                Text("Abfahrtzeit")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+            }
+            .padding(.horizontal, 4)
+
+            HStack {
+                DatePicker("", selection: $selectedDate, displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .tint(AppTheme.primaryColor)
+                Spacer()
+                if !Calendar.current.isDateInToday(selectedDate) {
+                    Button("Zurücksetzen") { selectedDate = Date() }
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppTheme.muted)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1)
+                    )
+            )
         }
     }
 
@@ -610,6 +655,7 @@ struct StationRowButtonStyle: ButtonStyle {
         authService: AuthService(),
         graphQLService: GraphQLService(),
         locationManager: LocationManager(),
-        selectedStation: .constant(nil)
+        selectedStation: .constant(nil),
+        selectedDate: .constant(Date())
     )
 }

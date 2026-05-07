@@ -90,6 +90,17 @@ final class DateFormattingHelper: @unchecked Sendable {
         return fullDateTimeFormatter.string(from: date)
     }
 
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "de_DE")
+        f.dateFormat = "EE, d. MMM"
+        return f
+    }()
+
+    func formatDateShort(_ date: Date) -> String {
+        return Self.shortDateFormatter.string(from: date)
+    }
+
     func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {
         let totalSeconds = max(0, Int(timeInterval))
         let minutes = totalSeconds / 60
@@ -196,22 +207,37 @@ struct TransportIconHelper {
     }
 
     static func getLineColor(for serviceType: String?, serviceName: String? = nil) -> Color {
-        if isSBahnLine(serviceType: serviceType, serviceName: serviceName) {
-            return .green
+        let normalized = getShortLineName(from: serviceName).uppercased()
+
+        switch normalized {
+        case "1":           return Color(hex: "#f39b9a")
+        case "3":           return Color(hex: "#d6ad00")
+        case "4", "4A":     return Color(hex: "#e30613")
+        case "5", "5A":     return Color(hex: "#00975f")
+        case "6":           return Color(hex: "#956c29")
+        case "7":           return Color(hex: "#fecc00")
+        case "60":          return Color(hex: "#4e2583")
+        case "61":          return Color(hex: "#4a96d1")
+        default: break
         }
+
         if isLongDistanceLine(serviceType: serviceType, serviceName: serviceName) {
-            return Color(red: 0.55, green: 0.0, blue: 0.05)
+            return Color(hex: "#4a96d1")
+        }
+        if isSBahnLine(serviceType: serviceType, serviceName: serviceName) {
+            return Color(hex: "#00975f")
         }
         if isRegionalLine(serviceType: serviceType, serviceName: serviceName) {
-            return Color(red: 0.4, green: 0.1, blue: 0.6)
+            return Color(hex: "#4e2583")
         }
+
         let type = (serviceType ?? "").uppercased()
         if type.contains("STRASSENBAHN") || type.contains("TRAM") {
-            return .red
+            return Color(hex: "#e30613")
         } else if type.contains("BUS") {
-            return .blue
+            return Color(hex: "#4a96d1")
         }
-        return .gray
+        return Color(hex: "#292524")
     }
 
     static func getTransportIcon(for serviceType: String?, serviceName: String? = nil) -> String {

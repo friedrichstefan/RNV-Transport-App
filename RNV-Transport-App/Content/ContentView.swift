@@ -38,12 +38,22 @@ struct ContentView: View {
             }
             .tag(0)
 
+            // MARK: - Departure Board Tab
+            DepartureBoardView(
+                authService: authService,
+                locationManager: locationManager
+            )
+            .tabItem {
+                Label("Abfahrten", systemImage: "clock.fill")
+            }
+            .tag(1)
+
             // MARK: - Planned Trips Tab
             PlannedTripsView()
                 .tabItem {
                     Label("Fahrten", systemImage: activeTripCount > 0 ? "bell.badge.fill" : "bell")
                 }
-                .tag(1)
+                .tag(2)
                 .badge(activeTripCount > 0 ? activeTripCount : 0)
 
             // MARK: - Settings Tab
@@ -51,7 +61,7 @@ struct ContentView: View {
                 .tabItem {
                     Label("Einstellungen", systemImage: "gearshape.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(AppTheme.primaryColor)
         .onAppear {

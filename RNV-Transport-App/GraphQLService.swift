@@ -679,8 +679,12 @@ class GraphQLService: ObservableObject {
                 }
                 switch mode {
                 case .replace: self.detailedTrips = newTrips
-                case .prepend: self.detailedTrips = newTrips + self.detailedTrips
-                case .append: self.detailedTrips.append(contentsOf: newTrips)
+                case .prepend:
+                    self.detailedTrips = newTrips + self.detailedTrips
+                    if self.detailedTrips.count > 50 { self.detailedTrips = Array(self.detailedTrips.prefix(50)) }
+                case .append:
+                    self.detailedTrips.append(contentsOf: newTrips)
+                    if self.detailedTrips.count > 50 { self.detailedTrips = Array(self.detailedTrips.suffix(50)) }
                 }
             }
         } catch {
@@ -688,6 +692,188 @@ class GraphQLService: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    // MARK: - Departures
+    // The RNV API has no native departures endpoint.
+    // We discover departures by querying trips to major hubs and extracting the first timed leg.
+
+    struct DeparturesResult {
+        let departures: [Departure]
+        let error: String?
+    }
+
+    private static var cachedHubIDs: [String] = []
+    private static var cachedHubIDsDate: Date?
+    private static let hubIDsCacheTTL: TimeInterval = 86400 // 24h
+
+    func getDepartures(globalID: String, accessToken: String, time: String? = nil) async -> DeparturesResult {
+        let cacheExpired = Self.cachedHubIDsDate.map { Date().timeIntervalSince($0) > Self.hubIDsCacheTTL } ?? true
+        if Self.cachedHubIDs.isEmpty || cacheExpired {
+            await resolveHubIDs(accessToken: accessToken)
+        }
+
+        let hubs = Self.cachedHubIDs.filter { $0 != globalID }
+        guard !hubs.isEmpty else {
+            return DeparturesResult(departures: [], error: "Abfahrtstafel nicht verfügbar")
+        }
+
+        let searchTime = time ?? ISO8601DateFormatter().string(from: Date())
+        var allDepartures: [Departure] = []
+
+        for hubID in hubs.prefix(3) {
+            let deps = await fetchFirstLegsAsDepartures(from: globalID, to: hubID, time: searchTime, accessToken: accessToken)
+            allDepartures.append(contentsOf: deps)
+        }
+
+        var seen = Set<String>()
+        var result = allDepartures.filter { seen.insert("\($0.lineName)-\($0.scheduledDeparture)").inserted }
+        result.sort {
+            let fmt = DateFormattingHelper.shared
+            guard let a = fmt.parseISO8601($0.scheduledDeparture),
+                  let b = fmt.parseISO8601($1.scheduledDeparture) else { return false }
+            return a < b
+        }
+
+        return DeparturesResult(departures: result, error: result.isEmpty ? "Keine Abfahrten gefunden" : nil)
+    }
+
+    private func resolveHubIDs(accessToken: String) async {
+        let hubNames = ["Mannheim Hauptbahnhof", "Heidelberg Hauptbahnhof", "Paradeplatz"]
+        var ids: [String] = []
+        for name in hubNames {
+            if let station = await silentSearchStation(name: name, accessToken: accessToken) {
+                ids.append(station.globalID)
+            }
+        }
+        Self.cachedHubIDs = ids
+        Self.cachedHubIDsDate = Date()
+    }
+
+    private func silentSearchStation(name: String, accessToken: String) async -> Station? {
+        let safeName = sanitize(name)
+        let query = """
+        {
+          stations(first: 1, name: "\(safeName)") {
+            elements {
+              ... on Station {
+                hafasID
+                globalID
+                longName
+              }
+            }
+          }
+        }
+        """
+        guard let data = try? await executeQuery(query: query, accessToken: accessToken),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let responseData = json["data"] as? [String: Any],
+              let stationsObj = responseData["stations"] as? [String: Any],
+              let elements = stationsObj["elements"] as? [[String: Any]],
+              let first = elements.first,
+              let hafasID = first["hafasID"] as? String,
+              let globalID = first["globalID"] as? String,
+              let longName = first["longName"] as? String
+        else { return nil }
+        return Station(hafasID: hafasID, globalID: globalID, longName: longName)
+    }
+
+    private func fetchFirstLegsAsDepartures(from originID: String, to destID: String, time: String, accessToken: String) async -> [Departure] {
+        let query = """
+        {
+          trips(
+            originGlobalID: "\(sanitize(originID))"
+            destinationGlobalID: "\(sanitize(destID))"
+            departureTime: "\(sanitize(time))"
+          ) {
+            legs {
+              ... on TimedLeg {
+                board {
+                  point {
+                    ... on StopPoint {
+                      stopPointName
+                    }
+                  }
+                  timetabledTime { isoString }
+                  estimatedTime { isoString }
+                }
+                alight {
+                  point {
+                    ... on StopPoint {
+                      stopPointName
+                    }
+                  }
+                  timetabledTime { isoString }
+                  estimatedTime { isoString }
+                }
+                legIntermediates {
+                  point {
+                    ... on StopPoint {
+                      stopPointName
+                    }
+                  }
+                }
+                service {
+                  name
+                  type
+                  destinationLabel
+                }
+              }
+            }
+          }
+        }
+        """
+
+        guard let data = try? await executeQuery(query: query, accessToken: accessToken),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let responseData = json["data"] as? [String: Any],
+              let trips = responseData["trips"] as? [[String: Any]]
+        else { return [] }
+
+        return trips.compactMap { trip -> Departure? in
+            guard let legs = trip["legs"] as? [[String: Any]],
+                  let firstTimedLeg = legs.first(where: { $0["board"] != nil }),
+                  let board = firstTimedLeg["board"] as? [String: Any],
+                  let service = firstTimedLeg["service"] as? [String: Any],
+                  let lineName = service["name"] as? String,
+                  let direction = service["destinationLabel"] as? String,
+                  let timetabled = (board["timetabledTime"] as? [String: Any])?["isoString"] as? String,
+                  timetabled != "null", !timetabled.isEmpty
+            else { return nil }
+
+            let estimated = (board["estimatedTime"] as? [String: Any])?["isoString"] as? String
+            let boardStopName = (board["point"] as? [String: Any])?["stopPointName"] as? String
+
+            let alight = firstTimedLeg["alight"] as? [String: Any]
+            let alightName = (alight?["point"] as? [String: Any])?["stopPointName"] as? String
+            let alightTimetabled = (alight?["timetabledTime"] as? [String: Any])?["isoString"] as? String
+            let alightEstimated = (alight?["estimatedTime"] as? [String: Any])?["isoString"] as? String
+            let finalStop = alightName.map {
+                DepartureStop(
+                    name: $0,
+                    scheduledTime: (alightTimetabled == "null") ? nil : alightTimetabled,
+                    estimatedTime: (alightEstimated == "null") ? nil : alightEstimated
+                )
+            }
+
+            let rawIntermediates = firstTimedLeg["legIntermediates"] as? [[String: Any]] ?? []
+            let intermediateStops: [DepartureStop] = rawIntermediates.compactMap { stop in
+                guard let point = stop["point"] as? [String: Any],
+                      let name = point["stopPointName"] as? String else { return nil }
+                return DepartureStop(name: name, scheduledTime: nil, estimatedTime: nil)
+            }
+
+            return Departure(
+                scheduledDeparture: timetabled,
+                estimatedDeparture: (estimated == "null") ? nil : estimated,
+                lineName: lineName,
+                direction: direction,
+                serviceType: service["type"] as? String,
+                boardStopName: boardStopName,
+                intermediateStops: intermediateStops,
+                finalStop: finalStop
+            )
+        }
     }
 
     // MARK: - Live Updates
