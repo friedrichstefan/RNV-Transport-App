@@ -14,6 +14,7 @@ struct PlannedTripCard: View {
     @State private var tripStatus: String = "Aktiv"
     @State private var isExpanded = false
     @State private var tripData: DetailedTrip?
+    @State private var isPulsing = false
 
     @EnvironmentObject var liveActivityManager: LiveActivityManager
     @Environment(\.colorScheme) private var colorScheme
@@ -82,11 +83,15 @@ struct PlannedTripCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 8, y: 4)
+                .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                .shadow(color: AppTheme.shadowColor(), radius: 8, y: 4)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
         )
         .onAppear {
             loadTripData()
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                isPulsing = true
+            }
         }
     }
 
@@ -141,7 +146,7 @@ struct PlannedTripCard: View {
             }
 
             if let firstTimedLeg = trip.legs.first(where: { $0.isTimedLeg }),
-               let serviceName = firstTimedLeg.serviceName,
+               firstTimedLeg.serviceName != nil,
                let destination = firstTimedLeg.destinationLabel {
 
                 HStack(spacing: 8) {
@@ -168,10 +173,17 @@ struct PlannedTripCard: View {
 
     @ViewBuilder
     private var statusBadge: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(Color.green)
-                .frame(width: 8, height: 8)
+        HStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.3))
+                    .frame(width: 16, height: 16)
+                    .scaleEffect(isPulsing ? 1.6 : 1.0)
+                    .opacity(isPulsing ? 0 : 0.6)
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+            }
 
             Text(tripStatus)
                 .font(.caption)
@@ -181,7 +193,7 @@ struct PlannedTripCard: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-            Capsule().fill(Color.green.opacity(0.15))
+            Capsule().fill(Color.green.opacity(0.12))
         )
     }
 

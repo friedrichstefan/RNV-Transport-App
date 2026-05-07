@@ -451,24 +451,22 @@ struct ContentMediumView: View {
 
     private var beforeDepartureView: some View {
         VStack(spacing: 0) {
-            // Header bar
             headerBar
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
-                .padding(.bottom, 8)
+                .padding(.bottom, 10)
 
-            // Großer Countdown-Bereich
-            HStack(spacing: 14) {
-                // Countdown prominent links
+            HStack(alignment: .center, spacing: 16) {
+                // Big countdown
                 VStack(spacing: 2) {
                     Text("ABFAHRT IN")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(accentColor.opacity(0.8))
 
                     let range = countdownRange(to: context.attributes.departureTimeISO)
                     if let range = range {
                         Text(timerInterval: range, countsDown: true)
-                            .font(.system(size: 32, weight: .heavy, design: .rounded))
+                            .font(.system(size: 36, weight: .heavy, design: .rounded))
                             .monospacedDigit()
                             .foregroundColor(hasDelay ? .orange : accentColor)
                             .contentTransition(.numericText(countsDown: true))
@@ -480,18 +478,16 @@ struct ContentMediumView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // Trennlinie
                 Rectangle()
-                    .fill(Color.secondary.opacity(0.2))
-                    .frame(width: 1, height: 50)
+                    .fill(Color.secondary.opacity(0.15))
+                    .frame(width: 1, height: 44)
 
-                // Abfahrtsdetails rechts
-                VStack(alignment: .leading, spacing: 6) {
-                    // Abfahrt
-                    HStack(spacing: 4) {
+                // Route summary
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 5) {
                         Circle()
                             .fill(accentColor)
-                            .frame(width: 6, height: 6)
+                            .frame(width: 7, height: 7)
                         Text(formattedTime(from: context.attributes.departureTimeISO))
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
                             .foregroundColor(.primary)
@@ -505,27 +501,21 @@ struct ContentMediumView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
-                        .padding(.leading, 10)
+                        .padding(.leading, 12)
 
-                    // Ankunft
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Circle()
-                            .strokeBorder(accentColor.opacity(0.4), lineWidth: 1.5)
-                            .frame(width: 6, height: 6)
+                            .strokeBorder(accentColor.opacity(0.5), lineWidth: 1.5)
+                            .frame(width: 7, height: 7)
                         Text(formattedTime(from: context.attributes.arrivalTimeISO))
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
                             .foregroundColor(.secondary)
-                        if hasDelay {
-                            Text("+\(context.state.delay ?? 0)'")
-                                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                                .foregroundColor(.orange.opacity(0.6))
-                        }
                     }
                     Text(context.attributes.endStation)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
-                        .padding(.leading, 10)
+                        .padding(.leading, 12)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -541,44 +531,70 @@ struct ContentMediumView: View {
 
     private var duringJourneyView: some View {
         VStack(spacing: 0) {
-            // Header bar
             headerBar
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
-                .padding(.bottom, 10)
+                .padding(.bottom, 8)
 
-            // Station timeline
-            StationTimelineRow(
-                fromStation: context.attributes.startStation,
-                toStation: context.attributes.endStation,
-                departureTimeISO: context.attributes.departureTimeISO,
-                arrivalTimeISO: context.attributes.arrivalTimeISO,
-                serviceType: context.state.serviceType,
-                lineName: context.state.lineName,
-                delay: context.state.delay
-            )
-            .frame(height: 52)
-            .padding(.horizontal, 16)
+            // Next stop + arrival countdown
+            HStack(alignment: .bottom, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("NÄCHSTER HALT")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.secondary)
+                    Text(context.state.nextStopName)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
 
-            Spacer().frame(height: 8)
+                Spacer()
 
-            // Progress + Countdown
-            HStack(spacing: 12) {
-                // Progress bar
-                JourneyProgressBar(
-                    departureDate: DateCalculationHelper.parseDate(context.attributes.departureTimeISO) ?? Date(),
-                    arrivalDate: DateCalculationHelper.parseDate(context.attributes.arrivalTimeISO) ?? Date().addingTimeInterval(1200),
-                    serviceType: context.state.serviceType,
-                    lineName: context.state.lineName,
-                    delay: context.state.delay,
-                    currentTime: currentTime
-                )
-
-                // Countdown
-                compactCountdown
-                    .frame(width: 70)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("ANKUNFT IN")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.secondary)
+                    let range = countdownRange(to: context.attributes.arrivalTimeISO)
+                    if let range = range {
+                        Text(timerInterval: range, countsDown: true)
+                            .font(.system(size: 20, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(hasDelay ? .orange : accentColor)
+                            .contentTransition(.numericText(countsDown: true))
+                    } else {
+                        Text("--:--")
+                            .font(.system(size: 18, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
             .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
+            // Progress bar
+            JourneyProgressBar(
+                departureDate: DateCalculationHelper.parseDate(context.attributes.departureTimeISO) ?? Date(),
+                arrivalDate: DateCalculationHelper.parseDate(context.attributes.arrivalTimeISO) ?? Date().addingTimeInterval(1200),
+                serviceType: context.state.serviceType,
+                lineName: context.state.lineName,
+                delay: context.state.delay,
+                currentTime: currentTime
+            )
+            .padding(.horizontal, 16)
+
+            // Departure / arrival time labels below bar
+            HStack {
+                Text(formattedTime(from: context.attributes.departureTimeISO))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(formattedTime(from: context.attributes.arrivalTimeISO))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 2)
             .padding(.bottom, 14)
         }
         .background(Color(.systemBackground))
@@ -674,7 +690,7 @@ struct ContentMediumView: View {
                     Text(timerInterval: range, countsDown: true)
                         .font(.system(size: 16, weight: .heavy, design: .rounded))
                         .monospacedDigit()
-                        .foregroundColor(hasDelay ? .orange : .blue)
+                        .foregroundColor(hasDelay ? .orange : accentColor)
                         .contentTransition(.numericText(countsDown: true))
                 } else {
                     Text("--:--")
@@ -937,10 +953,9 @@ struct DynamicIslandExpandedBottom: View {
     // MARK: - During Journey Bottom View (Dynamic Island)
 
     private var duringJourneyBottomView: some View {
-        VStack(spacing: 8) {
-            // Route with times
+        VStack(spacing: 6) {
+            // Station times row
             HStack(spacing: 0) {
-                // From
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 3) {
                         Text(formattedTime(from: departureTimeISO))
@@ -960,10 +975,25 @@ struct DynamicIslandExpandedBottom: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Center countdown
-                duringJourneyCountdown
-                    .frame(width: 64)
+                VStack(spacing: 0) {
+                    Text("noch")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.secondary)
+                    let range = arrivalRange()
+                    if let range = range {
+                        Text(timerInterval: range, countsDown: true)
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(hasDelay ? .orange : accentColor)
+                            .contentTransition(.numericText(countsDown: true))
+                    } else {
+                        Text("--:--")
+                            .font(.system(size: 13, weight: .heavy, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(width: 64)
 
-                // To
                 VStack(alignment: .trailing, spacing: 1) {
                     HStack(spacing: 3) {
                         if let d = delay, d > 0 {
@@ -998,27 +1028,6 @@ struct DynamicIslandExpandedBottom: View {
             .padding(.bottom, 4)
         }
         .padding(.top, 2)
-    }
-
-    @ViewBuilder
-    private var duringJourneyCountdown: some View {
-        let range = arrivalRange()
-        VStack(spacing: 0) {
-            Text("noch")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundColor(.secondary)
-            if let range = range {
-                Text(timerInterval: range, countsDown: true)
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundColor(hasDelay ? .orange : .blue)
-                    .contentTransition(.numericText(countsDown: true))
-            } else {
-                Text("--:--")
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .foregroundColor(.secondary)
-            }
-        }
     }
 
     private func departureRange() -> ClosedRange<Date>? {

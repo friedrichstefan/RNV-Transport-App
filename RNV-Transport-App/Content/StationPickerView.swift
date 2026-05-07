@@ -13,6 +13,7 @@ struct StationPickerView: View {
     @ObservedObject var graphQLService: GraphQLService
     @ObservedObject var locationManager: LocationManager
     @Binding var selectedStation: Station?
+    @Binding var selectedDate: Date
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -30,7 +31,7 @@ struct StationPickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(colorScheme == .dark ? .black : .systemGroupedBackground)
+                AppTheme.canvasAdaptive(colorScheme)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -140,12 +141,12 @@ struct StationPickerView: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(colorScheme == .dark ? .systemGray5 : .systemBackground))
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(
-                        isSearchFocused ? AppTheme.primaryColor.opacity(0.5) : Color.secondary.opacity(0.15),
+                        isSearchFocused ? AppTheme.primary.opacity(0.5) : AppTheme.hairlineAdaptive(colorScheme),
                         lineWidth: isSearchFocused ? 1.5 : 1
                     )
             )
@@ -159,13 +160,16 @@ struct StationPickerView: View {
     private var quickActionsView: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // Datum & Uhrzeit
+                dateTimeSection
+
                 // Standort-Button
                 if locationManager.location != nil {
                     Button(action: loadNearbyStations) {
                         HStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(AppTheme.primaryColor.opacity(0.12))
+                                    .fill(AppTheme.surfaceStrong)
                                     .frame(width: 44, height: 44)
                                 Image(systemName: "location.fill")
                                     .font(.system(size: 18, weight: .semibold))
@@ -190,7 +194,8 @@ struct StationPickerView: View {
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                                .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
                         )
                     }
                     .buttonStyle(.plain)
@@ -242,7 +247,8 @@ struct StationPickerView: View {
                         }
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                                .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
                         )
                     }
                 }
@@ -251,6 +257,47 @@ struct StationPickerView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
+        }
+    }
+
+    // MARK: - Date & Time Section
+
+    private var dateTimeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar.clock")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                Text("Abfahrtzeit")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+            }
+            .padding(.horizontal, 4)
+
+            HStack {
+                DatePicker("", selection: $selectedDate, displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .tint(AppTheme.primaryColor)
+                Spacer()
+                if !Calendar.current.isDateInToday(selectedDate) {
+                    Button("Zurücksetzen") { selectedDate = Date() }
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppTheme.muted)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1)
+                    )
+            )
         }
     }
 
@@ -306,7 +353,8 @@ struct StationPickerView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
             )
         }
     }
@@ -410,7 +458,8 @@ struct StationPickerView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
                     .padding(.horizontal, 16)
             )
             .padding(.bottom, 30)
@@ -424,7 +473,7 @@ struct StationPickerView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AppTheme.primaryColor.opacity(0.1))
+                    .fill(AppTheme.surfaceStrong)
                     .frame(width: 36, height: 36)
                 Image(systemName: "tram.fill")
                     .font(.system(size: 16))
@@ -438,9 +487,6 @@ struct StationPickerView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                Text(station.globalID)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.secondary.opacity(0.5))
             }
 
             Spacer()
@@ -609,6 +655,7 @@ struct StationRowButtonStyle: ButtonStyle {
         authService: AuthService(),
         graphQLService: GraphQLService(),
         locationManager: LocationManager(),
-        selectedStation: .constant(nil)
+        selectedStation: .constant(nil),
+        selectedDate: .constant(Date())
     )
 }

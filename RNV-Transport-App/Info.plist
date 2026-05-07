@@ -2,10 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>com.stefanfriedrich.rnvapp.liveactivity.refresh</string>
-	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -38,6 +34,10 @@
 	<string>$(RNV_SIGNING_KEY)</string>
 	<key>RNV_TENANT_ID</key>
 	<string>$(RNV_TENANT_ID)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ÖPNV Mannheim nutzt deinen Standort, um Haltestellen in deiner Nähe zu finden und dir passende Verbindungen anzuzeigen.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ÖPNV Mannheim nutzt deinen Standort, um Haltestellen in deiner Nähe zu finden und dir passende Verbindungen anzuzeigen.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

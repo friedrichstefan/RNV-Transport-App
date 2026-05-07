@@ -10,7 +10,7 @@ import Combine
 
 // MARK: - Data Models
 
-struct Station: Identifiable, Codable {
+struct Station: Identifiable, Codable, Equatable {
     let hafasID: String
     let globalID: String
     let longName: String
@@ -33,6 +33,87 @@ enum LegType: String, Codable {
     case continuousLeg = "ContinuousLeg"
     case interchangeLeg = "InterchangeLeg"
 }
+
+// MARK: - Occupancy Level Enum
+
+enum OccupancyLevel: String, Codable, CaseIterable {
+    case unknown = "UNKNOWN"
+    case low = "LOW"
+    case medium = "MEDIUM"
+    case high = "HIGH"
+    case veryHigh = "VERY_HIGH"
+    case full = "FULL"
+
+    /// Initialisiert aus beliebigem API-String (case-insensitive)
+    init(from apiValue: String) {
+        let normalized = apiValue.uppercased()
+            .replacingOccurrences(of: " ", with: "_")
+            .replacingOccurrences(of: "-", with: "_")
+        self = OccupancyLevel(rawValue: normalized) ?? .unknown
+    }
+
+    /// Benutzerfreundliche Beschreibung
+    var displayText: String {
+        switch self {
+        case .unknown: return "Keine Daten"
+        case .low: return "Gering"
+        case .medium: return "Mittel"
+        case .high: return "Hoch"
+        case .veryHigh: return "Sehr hoch"
+        case .full: return "Voll"
+        }
+    }
+
+    /// Kurztext für kompakte Darstellung
+    var shortText: String {
+        switch self {
+        case .unknown: return "?"
+        case .low: return "Gering"
+        case .medium: return "Mittel"
+        case .high: return "Hoch"
+        case .veryHigh: return "Sehr hoch"
+        case .full: return "Voll"
+        }
+    }
+
+    /// SF Symbol Name
+    var iconName: String {
+        switch self {
+        case .unknown: return "questionmark.circle"
+        case .low: return "person"
+        case .medium: return "person.2"
+        case .high: return "person.3"
+        case .veryHigh: return "person.3.fill"
+        case .full: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    /// Farbe für die UI-Darstellung
+    var color: Color {
+        switch self {
+        case .unknown: return .gray
+        case .low: return .green
+        case .medium: return .yellow
+        case .high: return .orange
+        case .veryHigh: return .red
+        case .full: return .red
+        }
+    }
+
+    /// Prozentuale Füllung (für Fortschrittsanzeige)
+    var fillPercentage: Double {
+        switch self {
+        case .unknown: return 0
+        case .low: return 0.25
+        case .medium: return 0.5
+        case .high: return 0.75
+        case .veryHigh: return 0.9
+        case .full: return 1.0
+        }
+    }
+}
+
+import SwiftUI
 
 struct DetailedTrip: Identifiable {
     let id: UUID
@@ -93,6 +174,15 @@ struct DetailedTrip: Identifiable {
     }
 }
 
+struct IntermediateStop {
+    let name: String
+    let scheduledTime: String
+    let estimatedTime: String?
+    let occupancy: OccupancyLevel?
+    let latitude: Double?
+    let longitude: Double?
+}
+
 struct TripLeg: Identifiable {
     let id = UUID()
     let type: LegType
@@ -109,9 +199,61 @@ struct TripLeg: Identifiable {
     let serviceName: String?
     let serviceDescription: String?
     let destinationLabel: String?
+    var intermediateStops: [IntermediateStop] = []
+
+    /// Auslastung/Kapazität für diesen Leg
+    let occupancy: OccupancyLevel?
+
+    /// API coordinates for the board stop (avoids geocoding)
+    let boardLatitude: Double?
+    let boardLongitude: Double?
+    /// API coordinates for the alight stop (avoids geocoding)
+    let alightLatitude: Double?
+    let alightLongitude: Double?
 
     /// Convenience: is this a timed (vehicle) leg?
     var isTimedLeg: Bool { type == .timedLeg }
+
+    // Initializer mit occupancy (Standard: nil)
+    init(
+        type: LegType,
+        mode: String?,
+        boardStopName: String?,
+        alightStopName: String?,
+        departureTime: String?,
+        arrivalTime: String?,
+        estimatedDepartureTime: String?,
+        estimatedArrivalTime: String?,
+        serviceType: String?,
+        serviceName: String?,
+        serviceDescription: String?,
+        destinationLabel: String?,
+        intermediateStops: [IntermediateStop] = [],
+        occupancy: OccupancyLevel? = nil,
+        boardLatitude: Double? = nil,
+        boardLongitude: Double? = nil,
+        alightLatitude: Double? = nil,
+        alightLongitude: Double? = nil
+    ) {
+        self.type = type
+        self.mode = mode
+        self.boardStopName = boardStopName
+        self.alightStopName = alightStopName
+        self.departureTime = departureTime
+        self.arrivalTime = arrivalTime
+        self.estimatedDepartureTime = estimatedDepartureTime
+        self.estimatedArrivalTime = estimatedArrivalTime
+        self.serviceType = serviceType
+        self.serviceName = serviceName
+        self.serviceDescription = serviceDescription
+        self.destinationLabel = destinationLabel
+        self.intermediateStops = intermediateStops
+        self.occupancy = occupancy
+        self.boardLatitude = boardLatitude
+        self.boardLongitude = boardLongitude
+        self.alightLatitude = alightLatitude
+        self.alightLongitude = alightLongitude
+    }
 }
 
 // MARK: - GraphQL Error
@@ -119,6 +261,14 @@ struct TripLeg: Identifiable {
 struct GraphQLError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
+}
+
+// MARK: - Connection Loading Mode
+
+enum ConnectionLoadingMode {
+    case replace
+    case prepend
+    case append
 }
 
 // MARK: - GraphQL Service
@@ -130,51 +280,51 @@ class GraphQLService: ObservableObject {
     @Published var detailedTrips: [DetailedTrip] = []
     @Published var isLoading = false
     @Published var lastError: GraphQLError?
-
+    
     internal var baseURL: String
-
+    
     init() {
         self.baseURL = Self.loadGraphQLURL()
-        #if DEBUG
+#if DEBUG
         print("📡 [GraphQL] Service initialisiert mit URL: \(self.baseURL)")
-        #endif
+#endif
     }
-
+    
     private static func loadGraphQLURL() -> String {
         let fallbackURL = "https://graphql-sandbox-dds.rnv-online.de/"
-
+        
         guard let bundleURL = Bundle.main.object(forInfoDictionaryKey: "RNV_GRAPHQL_URL") as? String else {
-            #if DEBUG
+#if DEBUG
             print("⚠️ [GraphQL] RNV_GRAPHQL_URL nicht in Info.plist gefunden")
-            #endif
+#endif
             return fallbackURL
         }
-
+        
         // Anführungszeichen entfernen, falls xcconfig-Wert mit Quotes gespeichert ist (z.B. "https://...")
         let trimmedURL = bundleURL.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-
+        
         guard !trimmedURL.contains("$(") else {
-            #if DEBUG
+#if DEBUG
             print("❌ [GraphQL] Variable nicht aufgelöst: \(trimmedURL)")
-            #endif
+#endif
             return fallbackURL
         }
-
+        
         guard !trimmedURL.isEmpty, URL(string: trimmedURL) != nil else {
-            #if DEBUG
+#if DEBUG
             print("❌ [GraphQL] Ungültige URL: \(trimmedURL)")
-            #endif
+#endif
             return fallbackURL
         }
-
-        #if DEBUG
+        
+#if DEBUG
         print("✅ [GraphQL] URL erfolgreich geladen: \(trimmedURL)")
-        #endif
+#endif
         return trimmedURL
     }
-
+    
     // MARK: - Input Sanitization
-
+    
     /// Sanitizes user input to prevent GraphQL injection.
     private func sanitize(_ input: String) -> String {
         return input
@@ -183,9 +333,9 @@ class GraphQLService: ObservableObject {
             .replacingOccurrences(of: "\n", with: "")
             .replacingOccurrences(of: "\r", with: "")
     }
-
+    
     // MARK: - GraphQL Error Extraction
-
+    
     private func extractGraphQLErrors(from data: Data) -> GraphQLError? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let errors = json["errors"] as? [[String: Any]],
@@ -194,13 +344,62 @@ class GraphQLService: ObservableObject {
         }
         return GraphQLError(message: firstMessage)
     }
-
+    
+    // MARK: - Query Execution
+    
+    /// Base implementation of query execution. Subclasses (e.g. SecureGraphQLService)
+    /// can override this to add SSL pinning, request signing, etc.
+    internal func executeQuery(query: String, accessToken: String) async throws -> Data {
+        guard let url = URL(string: baseURL) else {
+            throw GraphQLError(message: "Ungültige URL: \(baseURL)")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        
+        let body: [String: Any] = ["query": query]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
+            throw GraphQLError(message: "JSON Serialization fehlgeschlagen")
+        }
+        request.httpBody = bodyData
+        
+#if DEBUG
+        print("📡 [GraphQL] Anfrage an: \(url.host ?? "")")
+#endif
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+#if DEBUG
+            print("📡 [GraphQL] Response Status: \(httpResponse.statusCode)")
+#endif
+            guard (200...299).contains(httpResponse.statusCode) else {
+#if DEBUG
+                if let body = String(data: data, encoding: .utf8) {
+                    print("❌ [GraphQL] Error body (\(httpResponse.statusCode)): \(body)")
+                }
+#endif
+                throw GraphQLError(message: "HTTP-Fehler: \(httpResponse.statusCode)")
+            }
+        }
+        
+#if DEBUG
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("📡 [GraphQL] Response: \(jsonString.prefix(200))...")
+        }
+#endif
+        
+        return data
+    }
+    
     // MARK: - Station Search (Location-Based)
-
+    
     func searchStations(lat: Double, lon: Double, accessToken: String) async {
         isLoading = true
         lastError = nil
-
+        
         let query = """
         {
           stations(first: 10, lat: \(lat), long: \(lon), distance: 2.0) {
@@ -214,24 +413,25 @@ class GraphQLService: ObservableObject {
           }
         }
         """
-
+        
         do {
             let data = try await executeQuery(query: query, accessToken: accessToken)
-
+            
             if let gqlError = extractGraphQLErrors(from: data) {
                 lastError = gqlError
             }
-
+            
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let responseData = json["data"] as? [String: Any],
                let stations = responseData["stations"] as? [String: Any],
                let elements = stations["elements"] as? [[String: Any]] {
-
+                
                 self.stations = elements.compactMap { element -> Station? in
                     guard let hafasID = element["hafasID"] as? String,
                           let globalID = element["globalID"] as? String,
                           let longName = element["longName"] as? String else { return nil }
                     return Station(hafasID: hafasID, globalID: globalID, longName: longName)
+                    
                 }
             }
         } catch {
@@ -291,7 +491,7 @@ class GraphQLService: ObservableObject {
 
     // MARK: - Get Connections
 
-    func getConnections(fromGlobalID: String, toGlobalID: String, accessToken: String, departureTime: String? = nil) async {
+    func getConnections(fromGlobalID: String, toGlobalID: String, accessToken: String, departureTime: String? = nil, mode: ConnectionLoadingMode = .replace) async {
         isLoading = true
         lastError = nil
 
@@ -358,6 +558,13 @@ class GraphQLService: ObservableObject {
                     isoString
                   }
                 }
+                legIntermediates {
+                  point {
+                    ... on StopPoint {
+                      stopPointName
+                    }
+                  }
+                }
                 service {
                   type
                   name
@@ -394,7 +601,7 @@ class GraphQLService: ObservableObject {
                 print("🚆 [GraphQL] \(trips.count) Trips gefunden")
                 #endif
 
-                self.detailedTrips = trips.compactMap { trip -> DetailedTrip? in
+                let newTrips = trips.compactMap { trip -> DetailedTrip? in
                     guard let startTimeDict = trip["startTime"] as? [String: Any],
                           let startTime = startTimeDict["isoString"] as? String,
                           let endTimeDict = trip["endTime"] as? [String: Any],
@@ -414,6 +621,21 @@ class GraphQLService: ObservableObject {
                             let alightTimetabled = alight["timetabledTime"] as? [String: Any]
                             let alightEstimated = alight["estimatedTime"] as? [String: Any]
 
+                            let rawIntermediates = leg["legIntermediates"] as? [[String: Any]] ?? []
+                            let parsedIntermediates: [IntermediateStop] = rawIntermediates.compactMap { intermediate in
+                                guard let point = intermediate["point"] as? [String: Any],
+                                      let name = point["stopPointName"] as? String
+                                else { return nil }
+                                return IntermediateStop(
+                                    name: name,
+                                    scheduledTime: "",
+                                    estimatedTime: nil,
+                                    occupancy: nil,
+                                    latitude: nil,
+                                    longitude: nil
+                                )
+                            }
+
                             return TripLeg(
                                 type: .timedLeg,
                                 mode: nil,
@@ -426,12 +648,13 @@ class GraphQLService: ObservableObject {
                                 serviceType: service["type"] as? String,
                                 serviceName: service["name"] as? String,
                                 serviceDescription: service["description"] as? String,
-                                destinationLabel: service["destinationLabel"] as? String
+                                destinationLabel: service["destinationLabel"] as? String,
+                                intermediateStops: parsedIntermediates
                             )
-                        } else if let mode = leg["mode"] as? String {
+                        } else if let legMode = leg["mode"] as? String {
                             return TripLeg(
-                                type: mode == "WALK" ? .continuousLeg : .interchangeLeg,
-                                mode: mode,
+                                type: legMode == "WALK" ? .continuousLeg : .interchangeLeg,
+                                mode: legMode,
                                 boardStopName: nil,
                                 alightStopName: nil,
                                 departureTime: nil,
@@ -439,7 +662,7 @@ class GraphQLService: ObservableObject {
                                 estimatedDepartureTime: nil,
                                 estimatedArrivalTime: nil,
                                 serviceType: nil,
-                                serviceName: mode == "WALK" ? "Fußweg" : "Umstieg",
+                                serviceName: legMode == "WALK" ? "Fußweg" : "Umstieg",
                                 serviceDescription: nil,
                                 destinationLabel: nil
                             )
@@ -454,12 +677,203 @@ class GraphQLService: ObservableObject {
                         legs: parsedLegs
                     )
                 }
+                switch mode {
+                case .replace: self.detailedTrips = newTrips
+                case .prepend:
+                    self.detailedTrips = newTrips + self.detailedTrips
+                    if self.detailedTrips.count > 50 { self.detailedTrips = Array(self.detailedTrips.prefix(50)) }
+                case .append:
+                    self.detailedTrips.append(contentsOf: newTrips)
+                    if self.detailedTrips.count > 50 { self.detailedTrips = Array(self.detailedTrips.suffix(50)) }
+                }
             }
         } catch {
             lastError = GraphQLError(message: error.localizedDescription)
         }
 
         isLoading = false
+    }
+
+    // MARK: - Departures
+    // The RNV API has no native departures endpoint.
+    // We discover departures by querying trips to major hubs and extracting the first timed leg.
+
+    struct DeparturesResult {
+        let departures: [Departure]
+        let error: String?
+    }
+
+    private static var cachedHubIDs: [String] = []
+    private static var cachedHubIDsDate: Date?
+    private static let hubIDsCacheTTL: TimeInterval = 86400 // 24h
+
+    func getDepartures(globalID: String, accessToken: String, time: String? = nil) async -> DeparturesResult {
+        let cacheExpired = Self.cachedHubIDsDate.map { Date().timeIntervalSince($0) > Self.hubIDsCacheTTL } ?? true
+        if Self.cachedHubIDs.isEmpty || cacheExpired {
+            await resolveHubIDs(accessToken: accessToken)
+        }
+
+        let hubs = Self.cachedHubIDs.filter { $0 != globalID }
+        guard !hubs.isEmpty else {
+            return DeparturesResult(departures: [], error: "Abfahrtstafel nicht verfügbar")
+        }
+
+        let searchTime = time ?? ISO8601DateFormatter().string(from: Date())
+        var allDepartures: [Departure] = []
+
+        for hubID in hubs.prefix(3) {
+            let deps = await fetchFirstLegsAsDepartures(from: globalID, to: hubID, time: searchTime, accessToken: accessToken)
+            allDepartures.append(contentsOf: deps)
+        }
+
+        var seen = Set<String>()
+        var result = allDepartures.filter { seen.insert("\($0.lineName)-\($0.scheduledDeparture)").inserted }
+        result.sort {
+            let fmt = DateFormattingHelper.shared
+            guard let a = fmt.parseISO8601($0.scheduledDeparture),
+                  let b = fmt.parseISO8601($1.scheduledDeparture) else { return false }
+            return a < b
+        }
+
+        return DeparturesResult(departures: result, error: result.isEmpty ? "Keine Abfahrten gefunden" : nil)
+    }
+
+    private func resolveHubIDs(accessToken: String) async {
+        let hubNames = ["Mannheim Hauptbahnhof", "Heidelberg Hauptbahnhof", "Paradeplatz"]
+        var ids: [String] = []
+        for name in hubNames {
+            if let station = await silentSearchStation(name: name, accessToken: accessToken) {
+                ids.append(station.globalID)
+            }
+        }
+        Self.cachedHubIDs = ids
+        Self.cachedHubIDsDate = Date()
+    }
+
+    private func silentSearchStation(name: String, accessToken: String) async -> Station? {
+        let safeName = sanitize(name)
+        let query = """
+        {
+          stations(first: 1, name: "\(safeName)") {
+            elements {
+              ... on Station {
+                hafasID
+                globalID
+                longName
+              }
+            }
+          }
+        }
+        """
+        guard let data = try? await executeQuery(query: query, accessToken: accessToken),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let responseData = json["data"] as? [String: Any],
+              let stationsObj = responseData["stations"] as? [String: Any],
+              let elements = stationsObj["elements"] as? [[String: Any]],
+              let first = elements.first,
+              let hafasID = first["hafasID"] as? String,
+              let globalID = first["globalID"] as? String,
+              let longName = first["longName"] as? String
+        else { return nil }
+        return Station(hafasID: hafasID, globalID: globalID, longName: longName)
+    }
+
+    private func fetchFirstLegsAsDepartures(from originID: String, to destID: String, time: String, accessToken: String) async -> [Departure] {
+        let query = """
+        {
+          trips(
+            originGlobalID: "\(sanitize(originID))"
+            destinationGlobalID: "\(sanitize(destID))"
+            departureTime: "\(sanitize(time))"
+          ) {
+            legs {
+              ... on TimedLeg {
+                board {
+                  point {
+                    ... on StopPoint {
+                      stopPointName
+                    }
+                  }
+                  timetabledTime { isoString }
+                  estimatedTime { isoString }
+                }
+                alight {
+                  point {
+                    ... on StopPoint {
+                      stopPointName
+                    }
+                  }
+                  timetabledTime { isoString }
+                  estimatedTime { isoString }
+                }
+                legIntermediates {
+                  point {
+                    ... on StopPoint {
+                      stopPointName
+                    }
+                  }
+                }
+                service {
+                  name
+                  type
+                  destinationLabel
+                }
+              }
+            }
+          }
+        }
+        """
+
+        guard let data = try? await executeQuery(query: query, accessToken: accessToken),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let responseData = json["data"] as? [String: Any],
+              let trips = responseData["trips"] as? [[String: Any]]
+        else { return [] }
+
+        return trips.compactMap { trip -> Departure? in
+            guard let legs = trip["legs"] as? [[String: Any]],
+                  let firstTimedLeg = legs.first(where: { $0["board"] != nil }),
+                  let board = firstTimedLeg["board"] as? [String: Any],
+                  let service = firstTimedLeg["service"] as? [String: Any],
+                  let lineName = service["name"] as? String,
+                  let direction = service["destinationLabel"] as? String,
+                  let timetabled = (board["timetabledTime"] as? [String: Any])?["isoString"] as? String,
+                  timetabled != "null", !timetabled.isEmpty
+            else { return nil }
+
+            let estimated = (board["estimatedTime"] as? [String: Any])?["isoString"] as? String
+            let boardStopName = (board["point"] as? [String: Any])?["stopPointName"] as? String
+
+            let alight = firstTimedLeg["alight"] as? [String: Any]
+            let alightName = (alight?["point"] as? [String: Any])?["stopPointName"] as? String
+            let alightTimetabled = (alight?["timetabledTime"] as? [String: Any])?["isoString"] as? String
+            let alightEstimated = (alight?["estimatedTime"] as? [String: Any])?["isoString"] as? String
+            let finalStop = alightName.map {
+                DepartureStop(
+                    name: $0,
+                    scheduledTime: (alightTimetabled == "null") ? nil : alightTimetabled,
+                    estimatedTime: (alightEstimated == "null") ? nil : alightEstimated
+                )
+            }
+
+            let rawIntermediates = firstTimedLeg["legIntermediates"] as? [[String: Any]] ?? []
+            let intermediateStops: [DepartureStop] = rawIntermediates.compactMap { stop in
+                guard let point = stop["point"] as? [String: Any],
+                      let name = point["stopPointName"] as? String else { return nil }
+                return DepartureStop(name: name, scheduledTime: nil, estimatedTime: nil)
+            }
+
+            return Departure(
+                scheduledDeparture: timetabled,
+                estimatedDeparture: (estimated == "null") ? nil : estimated,
+                lineName: lineName,
+                direction: direction,
+                serviceType: service["type"] as? String,
+                boardStopName: boardStopName,
+                intermediateStops: intermediateStops,
+                finalStop: finalStop
+            )
+        }
     }
 
     // MARK: - Live Updates
@@ -470,35 +884,5 @@ class GraphQLService: ObservableObject {
         print("⚠️ [GraphQL] Live-Update API noch nicht implementiert")
         #endif
         return nil
-    }
-
-    // MARK: - Execute Query
-
-    internal func executeQuery(query: String, accessToken: String) async throws -> Data {
-        guard let url = URL(string: baseURL) else {
-            throw GraphQLError(message: "Ungültige URL: \(baseURL)")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
-        let body = ["query": query]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        if let httpResponse = response as? HTTPURLResponse {
-            #if DEBUG
-            print("📡 [GraphQL] Response Status: \(httpResponse.statusCode)")
-            #endif
-
-            guard (200...299).contains(httpResponse.statusCode) else {
-                throw GraphQLError(message: "HTTP-Fehler: \(httpResponse.statusCode)")
-            }
-        }
-
-        return data
     }
 }
