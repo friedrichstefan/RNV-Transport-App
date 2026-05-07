@@ -9,6 +9,7 @@ struct OnboardingView: View {
     @Binding var hasSeenOnboarding: Bool
     @State private var currentPage = 0
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
@@ -45,7 +46,7 @@ struct OnboardingView: View {
                 Spacer()
 
                 pageContent
-                    .transition(.asymmetric(
+                    .transition(reduceMotion ? .opacity : .asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
                         removal: .move(edge: .leading).combined(with: .opacity)
                     ))
@@ -74,6 +75,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.white)
                     .symbolRenderingMode(.hierarchical)
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 16) {
                 Text(pages[currentPage].title)
@@ -104,6 +106,8 @@ struct OnboardingView: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: currentPage)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Seite \(currentPage + 1) von \(pages.count)")
 
             if currentPage < pages.count - 1 {
                 HStack {

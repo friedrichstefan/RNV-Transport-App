@@ -112,6 +112,7 @@ struct TimedLegCard: View {
             }
         }
         .padding(.vertical, 16)
+        .accessibilityHidden(true)
     }
 
     // MARK: - Line Header
@@ -153,6 +154,12 @@ struct TimedLegCard: View {
 
             Spacer()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel({
+            let name = leg.serviceName ?? "Unbekannte Linie"
+            if let dest = leg.destinationLabel { return "\(name) Richtung \(dest)" }
+            return name
+        }())
     }
 
     // MARK: - Intermediate Stops
@@ -174,6 +181,7 @@ struct TimedLegCard: View {
                         }
                     }
                     .frame(width: 48, alignment: .center)
+                    .accessibilityHidden(true)
 
                     Text("\(leg.intermediateStops.count) Zwischenhalte")
                         .font(.caption)
@@ -189,6 +197,10 @@ struct TimedLegCard: View {
                 .padding(.vertical, 6)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(isExpanded
+                ? "\(leg.intermediateStops.count) Zwischenhalte, Einklappen"
+                : "\(leg.intermediateStops.count) Zwischenhalte, Ausklappen")
+            .accessibilityHint(isExpanded ? "Tippen zum Ausblenden" : "Tippen zum Anzeigen")
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
@@ -231,6 +243,7 @@ struct TimedLegCard: View {
             Circle()
                 .fill(lineColor.opacity(0.35))
                 .frame(width: 6, height: 6)
+                .accessibilityHidden(true)
 
             Text(stop.name)
                 .font(.caption)
@@ -239,6 +252,13 @@ struct TimedLegCard: View {
 
             Spacer()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel({
+            var text = stop.name
+            text += ", \(formatter.formatTime(stop.scheduledTime))"
+            if let d = delay, d > 0 { text += ", +\(d) Minuten Verspätung" }
+            return text
+        }())
     }
 
     // MARK: - Stop Row (Abfahrt / Ankunft)
@@ -308,6 +328,14 @@ struct TimedLegCard: View {
 
             Spacer()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel({
+            var text = "\(stationName), \(formatter.formatTime(scheduledTime))"
+            if let d = delayMinutes {
+                text += d > 0 ? ", +\(d) Minuten Verspätung" : ", pünktlich"
+            }
+            return text
+        }())
     }
 
 }
@@ -352,6 +380,7 @@ struct TransferConnector: View {
                     .frame(maxHeight: .infinity)
             }
             .frame(width: 44)
+            .accessibilityHidden(true)
 
             // Transfer-Inhalt
             HStack(spacing: 10) {
@@ -364,6 +393,7 @@ struct TransferConnector: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(isWalk ? .orange : .blue)
                 }
+                .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isWalk ? "Fußweg" : "Umstieg")
@@ -424,6 +454,13 @@ struct TransferConnector: View {
                         )
                 )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel({
+            var text = isWalk ? "Fußweg" : "Umstieg"
+            if let duration = transferDuration { text += ", \(duration)" }
+            if let mins = getTransferMinutes(), mins <= 3 { text += ", Achtung: kurzer Umstieg!" }
+            return text
+        }())
     }
 
     private func getTransferMinutes() -> Int? {

@@ -13,6 +13,9 @@ struct TripCard: View {
     @Environment(\.colorScheme) private var colorScheme
     private let formatter = DateFormattingHelper.shared
 
+    @ScaledMetric(relativeTo: .title2) private var largeTimeSize: CGFloat = 22
+    @ScaledMetric(relativeTo: .title3) private var smallTimeSize: CGFloat = 20
+
     private var isPast: Bool {
         guard let endDate = formatter.parseISO8601(trip.endTime) else { return false }
         return endDate < Date()
@@ -80,6 +83,8 @@ struct TripCard: View {
         .padding(.horizontal)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Details anzeigen")
     }
 
     private var accessibilityDescription: String {
@@ -117,12 +122,12 @@ struct TripCard: View {
                     .foregroundColor(.secondary)
                     .strikethrough(true, color: .red.opacity(0.5))
                 Text(formatter.formatTime(est))
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: smallTimeSize, weight: .bold))
                     .foregroundColor(.red)
             }
         } else {
             Text(formatter.formatTime(scheduled))
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: largeTimeSize, weight: .bold))
                 .foregroundColor(.primary)
         }
     }

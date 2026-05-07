@@ -26,6 +26,7 @@ struct DepartureBoardView: View {
     @State private var departureDate: Date = Date()
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     private let formatter = DateFormattingHelper.shared
 
     var body: some View {
@@ -148,18 +149,18 @@ struct DepartureBoardView: View {
                 HStack(spacing: 12) {
                     if let last = lastRefresh {
                         Text("Aktuell um \(formatter.formatTimeFromDate(last)) Uhr")
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.muted)
+                            .font(.caption)
+                            .foregroundColor(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
                     }
                     if !Calendar.current.isDateInToday(departureDate) {
                         Text(formatter.formatDateShort(departureDate))
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.caption.weight(.medium))
                             .foregroundColor(AppTheme.primaryColor)
                     }
                     Button(action: { showStationPicker = true }) {
                         HStack(spacing: 3) {
                             Text(lastRefresh == nil ? "Haltestelle wählen" : "Ändern")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.caption.weight(.medium))
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 9, weight: .semibold))
                         }
@@ -198,6 +199,8 @@ struct DepartureBoardView: View {
             AppTheme.hairline.frame(height: 1),
             alignment: .bottom
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Kein Internet – angezeigte Daten könnten veraltet sein")
     }
 
     // MARK: - Departure List
@@ -234,6 +237,8 @@ struct DepartureBoardView: View {
                 .foregroundColor(AppTheme.muted)
             Spacer()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Abfahrten werden geladen")
     }
 
     // MARK: - Prompt
@@ -397,6 +402,7 @@ struct DepartureRowView: View {
     let departure: Departure
     private let formatter = DateFormattingHelper.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     var body: some View {
         HStack(spacing: 16) {
@@ -404,12 +410,12 @@ struct DepartureRowView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(departure.direction)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(AppTheme.ink)
                     .lineLimit(1)
                 Text(departure.serviceTypeDisplay)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(AppTheme.muted)
+                    .font(.caption2.weight(.medium))
+                    .foregroundColor(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
                     .tracking(0.2)
             }
 
@@ -417,16 +423,16 @@ struct DepartureRowView: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 Text(formatter.formatTime(departure.scheduledDeparture))
-                    .font(.system(size: 16, weight: .semibold).monospacedDigit())
+                    .font(.callout.weight(.semibold).monospacedDigit())
                     .foregroundColor(AppTheme.inkAdaptive(colorScheme))
 
                 if let delay = departure.delayMinutes, delay > 0 {
                     Text("+\(delay) min")
-                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .font(.caption2.weight(.semibold).monospacedDigit())
                         .foregroundColor(AppTheme.semanticError)
                 } else if departure.delayMinutes == 0 {
                     Text("pünktlich")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.caption2.weight(.medium))
                         .foregroundColor(AppTheme.semanticSuccess)
                 }
             }
@@ -435,11 +441,12 @@ struct DepartureRowView: View {
         .padding(.vertical, 14)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(departure.lineName) Richtung \(departure.direction), \(formatter.formatTime(departure.scheduledDeparture))\(departure.delayMinutes.map { $0 > 0 ? ", +\($0) Minuten" : ", pünktlich" } ?? "")")
+        .accessibilityHint("Tippen für Details")
     }
 
     private var lineBadge: some View {
         Text(TransportIconHelper.getShortLineName(from: departure.lineName))
-            .font(.system(size: 13, weight: .bold, design: .monospaced))
+            .font(Font.system(.caption, design: .monospaced).weight(.bold))
             .foregroundColor(.white)
             .frame(minWidth: 38, minHeight: 28)
             .padding(.horizontal, 6)
@@ -517,7 +524,12 @@ struct DepartureTripDetailView: View {
     let departure: Departure
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     private let formatter = DateFormattingHelper.shared
+
+    @ScaledMetric(relativeTo: .title) private var departureTimeSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .title2) private var countdownSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .title3) private var countdownUnitSize: CGFloat = 14
 
     var body: some View {
         NavigationView {
@@ -574,6 +586,8 @@ struct DepartureTripDetailView: View {
             .padding(.top, 24)
             .padding(.bottom, 20)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(departure.serviceTypeDisplay) \(departure.lineName) Richtung \(departure.direction)")
     }
 
     private var lineBadge: some View {
@@ -595,17 +609,28 @@ struct DepartureTripDetailView: View {
         }
         .padding(.vertical, 20)
         .padding(.horizontal, 20)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel({
+            var label = "Abfahrt um \(formatter.formatTime(departure.scheduledDeparture))"
+            if let delay = departure.delayMinutes {
+                label += delay > 0 ? ", \(delay) Minuten Verspätung" : ", pünktlich"
+            }
+            if let mins = departure.minutesUntilDeparture {
+                label += mins == 0 ? ", Abfahrt jetzt" : ", Abfahrt in \(mins) Minuten"
+            }
+            return label
+        }())
     }
 
     private var departureTimeBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Abfahrt")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(AppTheme.muted)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
                 .tracking(0.3)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(formatter.formatTime(departure.scheduledDeparture))
-                    .font(.system(size: 28, weight: .semibold).monospacedDigit())
+                    .font(.system(size: departureTimeSize, weight: .semibold).monospacedDigit())
                     .foregroundStyle(AppTheme.inkAdaptive(colorScheme))
                 delayBadge
             }
@@ -634,28 +659,28 @@ struct DepartureTripDetailView: View {
     private var countdownBlock: some View {
         VStack(alignment: .trailing, spacing: 4) {
             Text("Abfahrt in")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(AppTheme.muted)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
                 .tracking(0.3)
             if let mins = departure.minutesUntilDeparture {
                 if mins == 0 {
                     Text("jetzt")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(size: countdownSize * 0.78, weight: .bold))
                         .foregroundStyle(departure.lineColor)
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(mins)")
-                            .font(.system(size: 28, weight: .semibold).monospacedDigit())
+                            .font(.system(size: countdownSize, weight: .semibold).monospacedDigit())
                             .foregroundStyle(AppTheme.inkAdaptive(colorScheme))
                         Text("min")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(AppTheme.muted)
+                            .font(.system(size: countdownUnitSize, weight: .medium))
+                            .foregroundStyle(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
                     }
                 }
             } else {
                 Text("–")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(AppTheme.muted)
+                    .font(.system(size: countdownSize * 0.78, weight: .semibold))
+                    .foregroundStyle(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -669,6 +694,7 @@ struct DepartureTripDetailView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(AppTheme.muted)
                 .tracking(0.5)
+                .accessibilityAddTraits(.isHeader)
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
                 .padding(.bottom, 16)
@@ -780,17 +806,17 @@ private struct StopTimelineRow: View {
                     )
             }
             .frame(width: 56)
+            .accessibilityHidden(true)
 
             // Stop name + delay
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.system(size: isFinal || isFirst ? 15 : 14,
-                                  weight: isFinal || isFirst ? .medium : .regular))
+                    .font(isFinal || isFirst ? .subheadline.weight(.medium) : .subheadline)
                     .foregroundStyle(isFinal || isFirst ? Color.primary : Color.secondary)
                     .lineLimit(1)
                 if let d = delay, d > 0 {
                     Text("+\(d) min")
-                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .font(.caption2.weight(.semibold).monospacedDigit())
                         .foregroundStyle(AppTheme.semanticError)
                 }
             }
@@ -801,14 +827,21 @@ private struct StopTimelineRow: View {
             // Time
             if let t = time {
                 Text(t)
-                    .font(.system(size: isFinal || isFirst ? 15 : 13,
-                                  weight: isFinal || isFirst ? .semibold : .regular)
-                        .monospacedDigit())
+                    .font(isFinal || isFirst
+                          ? .subheadline.weight(.semibold).monospacedDigit()
+                          : .footnote.monospacedDigit())
                     .foregroundStyle(isFinal || isFirst ? Color.primary : Color.secondary)
             }
         }
         .padding(.horizontal, 20)
         .frame(minHeight: 44)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel({
+            var parts: [String] = [name]
+            if let t = time { parts.append("um \(t)") }
+            if let d = delay, d > 0 { parts.append("+\(d) Minuten Verspätung") }
+            return parts.joined(separator: ", ")
+        }())
     }
 }
 

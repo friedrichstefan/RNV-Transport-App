@@ -109,6 +109,7 @@ struct SettingsView: View {
                     .symbolRenderingMode(.hierarchical)
             }
             .shadow(color: AppTheme.surfaceDark.opacity(0.25), radius: 10, x: 0, y: 4)
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("ÖPNV Mannheim")
@@ -136,6 +137,8 @@ struct SettingsView: View {
         .background(cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("ÖPNV Mannheim, Version 1.1.0, Mannheim & Umgebung")
     }
 
     // MARK: - Search Section
@@ -148,7 +151,7 @@ struct SettingsView: View {
                     .font(.body)
                     .foregroundColor(AppTheme.inkAdaptive(colorScheme))
                 Spacer()
-                CounterControl(value: $maxConnections, range: 3...10, tint: AppTheme.primaryColor)
+                CounterControl(value: $maxConnections, range: 3...10, tint: AppTheme.primaryColor, label: "Maximale Verbindungen")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -170,6 +173,8 @@ struct SettingsView: View {
                 Slider(value: $defaultSearchRadius, in: 0.5...5.0, step: 0.5)
                     .tint(AppTheme.primaryColor)
                     .padding(.leading, 44)
+                    .accessibilityLabel("Suchradius")
+                    .accessibilityValue("\(String(format: "%.1f", defaultSearchRadius)) Kilometer")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -224,6 +229,7 @@ struct SettingsView: View {
                         Text("\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))")
                             .font(.caption.monospacedDigit())
                             .foregroundColor(AppTheme.muted)
+                            .accessibilityLabel("Koordinaten: \(String(format: "%.4f", location.latitude)) nördlich, \(String(format: "%.4f", location.longitude)) östlich")
                         if developerMode {
                             Text("Teststandort aktiv")
                                 .font(.caption2.weight(.semibold))
@@ -249,6 +255,7 @@ struct SettingsView: View {
                             .background(AppTheme.primaryColor.opacity(0.1))
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Standort aktualisieren")
                 }
             }
             .padding(.horizontal, 16)
@@ -310,6 +317,7 @@ struct SettingsView: View {
             Toggle("", isOn: $developerMode)
                 .tint(.orange)
                 .labelsHidden()
+                .accessibilityLabel("Entwicklermodus")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -374,10 +382,12 @@ private struct SettingsCard<Content: View>: View {
                 Image(systemName: icon)
                     .font(.caption.weight(.semibold))
                     .foregroundColor(iconColor)
+                    .accessibilityHidden(true)
                 Text(title.uppercased())
                     .font(.caption.weight(.semibold))
                     .foregroundColor(AppTheme.muted)
                     .tracking(0.4)
+                    .accessibilityAddTraits(.isHeader)
             }
             .padding(.leading, 4)
 
@@ -417,6 +427,7 @@ private struct ToggleRow: View {
             Toggle("", isOn: $binding)
                 .tint(AppTheme.primaryColor)
                 .labelsHidden()
+                .accessibilityLabel(title)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -461,6 +472,7 @@ private struct IconBadge: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(color)
         }
+        .accessibilityHidden(true)
     }
 }
 
@@ -468,6 +480,7 @@ private struct CounterControl: View {
     @Binding var value: Int
     let range: ClosedRange<Int>
     let tint: Color
+    var label: String = "Wert"
 
     var body: some View {
         HStack(spacing: 10) {
@@ -482,11 +495,13 @@ private struct CounterControl: View {
                     .clipShape(Circle())
             }
             .disabled(value <= range.lowerBound)
+            .accessibilityLabel("\(label) verringern")
 
             Text("\(value)")
                 .font(.body.weight(.semibold))
                 .monospacedDigit()
                 .frame(minWidth: 20, alignment: .center)
+                .accessibilityHidden(true)
 
             Button {
                 if value < range.upperBound { value += 1 }
@@ -499,7 +514,10 @@ private struct CounterControl: View {
                     .clipShape(Circle())
             }
             .disabled(value >= range.upperBound)
+            .accessibilityLabel("\(label) erhöhen")
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityValue("\(value)")
     }
 }
 

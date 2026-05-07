@@ -54,11 +54,13 @@ struct TripDetailView: View {
                             Image(systemName: "square.and.arrow.up")
                                 .foregroundColor(AppTheme.primaryColor)
                         }
+                        .accessibilityLabel("Verbindung teilen")
                         Button(action: { dismiss() }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(AppTheme.mutedSoft)
                                 .font(.title3)
                         }
+                        .accessibilityLabel("Schließen")
                     }
                 }
             }
@@ -153,6 +155,17 @@ struct TripDetailView: View {
         )
         .padding(.horizontal)
         .padding(.top, 20)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel({
+            var desc = ""
+            if let orig = origin, let dest = destination { desc += "\(orig) nach \(dest), " }
+            desc += "Abfahrt \(formatter.formatTime(trip.startTime)), Ankunft \(formatter.formatTime(trip.endTime))"
+            desc += ", \(formatter.calculateDuration(start: trip.startTime, end: trip.endTime))"
+            if trip.interchanges == 0 { desc += ", direkt" }
+            else { desc += ", \(trip.interchanges) Umstieg\(trip.interchanges == 1 ? "" : "e")" }
+            if maxDelay >= 2 { desc += ", \(maxDelay) Minuten Verspätung" }
+            return desc
+        }())
     }
 
     @ViewBuilder
@@ -229,6 +242,8 @@ struct TripDetailView: View {
             Toggle("", isOn: $isLiveActivityActive)
                 .labelsHidden()
                 .tint(.green)
+                .accessibilityLabel("Live-Verfolgung")
+                .accessibilityHint(isLiveActivityActive ? "Aktiv, Tippen zum Deaktivieren" : "Inaktiv, Tippen zum Aktivieren")
         }
         .padding(16)
         .background(
@@ -263,6 +278,10 @@ struct TripDetailView: View {
                         bottomInset: 60
                     )
                     .onTapGesture { showFullMap = true }
+                    .accessibilityLabel("Streckenübersicht auf der Karte")
+                    .accessibilityHint("Tippen für vollständige Karte")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { showFullMap = true }
 
                     VStack {
                         HStack {
@@ -281,6 +300,7 @@ struct TripDetailView: View {
                         Spacer()
                     }
                     .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                 }
             }
             .frame(height: 200)

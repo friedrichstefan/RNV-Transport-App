@@ -37,6 +37,8 @@ struct ConnectionsView: View {
 
     @ObservedObject private var network = NetworkMonitor.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     private let formatter = DateFormattingHelper.shared
 
@@ -101,6 +103,8 @@ struct ConnectionsView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 9)
                         .background(Color.orange)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Kein Internet – Verbindung nicht möglich")
                         Spacer()
                     }
                     .zIndex(2)
@@ -170,8 +174,10 @@ struct ConnectionsView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.06)) {
                 headerAppeared = true
             }
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                pulseScale = 1.55
+            if !reduceMotion {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    pulseScale = 1.55
+                }
             }
         }
     }
@@ -220,6 +226,7 @@ struct ConnectionsView: View {
                         .font(AppTheme.monoFont(size: 18))
                         .foregroundColor(AppTheme.inkAdaptive(colorScheme))
                         .contentTransition(.numericText())
+                        .accessibilityLabel("Aktuelle Uhrzeit: \(Self.headerTimeFormatter.string(from: timeline.date))")
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -296,8 +303,8 @@ struct ConnectionsView: View {
                     .background(Circle().fill(AppTheme.surfaceStrongAdaptive(colorScheme)))
 
                 Text(station?.longName ?? placeholder)
-                    .font(.system(size: 15, weight: station != nil ? .semibold : .regular))
-                    .foregroundColor(station != nil ? AppTheme.inkAdaptive(colorScheme) : AppTheme.mutedSoft)
+                    .font(.subheadline.weight(station != nil ? .semibold : .regular))
+                    .foregroundColor(station != nil ? AppTheme.inkAdaptive(colorScheme) : AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
                     .lineLimit(1)
 
                 Spacer()
@@ -357,6 +364,7 @@ struct ConnectionsView: View {
                     .fill(Color(red: 0.2, green: 0.9, blue: 0.5))
                     .frame(width: 6, height: 6)
             }
+            .accessibilityHidden(true)
 
             TimelineView(.periodic(from: Date(), by: 1.0)) { timeline in
                 Text(Self.headerTimeFormatter.string(from: timeline.date))
@@ -364,6 +372,7 @@ struct ConnectionsView: View {
                     .foregroundColor(AppTheme.inkAdaptive(colorScheme))
                     .contentTransition(.numericText())
             }
+            .accessibilityHidden(true)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
@@ -445,6 +454,8 @@ struct ConnectionsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Verbindung wird hergestellt")
     }
 
     // MARK: - Manual Login View
@@ -546,6 +557,8 @@ struct ConnectionsView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange.opacity(0.18), lineWidth: 1))
         )
         .padding(.horizontal)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Fehler: \(message)")
     }
 
     // MARK: - Search Actions Card
@@ -579,6 +592,7 @@ struct ConnectionsView: View {
                 )
                 .datePickerStyle(.compact)
                 .labelsHidden()
+                .accessibilityLabel("Abfahrtszeit auswählen")
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -605,6 +619,7 @@ struct ConnectionsView: View {
                             .fill(AppTheme.primary)
                     )
                 }
+                .accessibilityHint("Sucht Verbindungen zwischen Start und Ziel")
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .transition(.opacity.combined(with: .scale(scale: 0.97)))
@@ -628,6 +643,7 @@ struct ConnectionsView: View {
             Image(systemName: "tram.fill")
                 .font(.system(size: 44))
                 .foregroundColor(AppTheme.mutedSoft)
+                .accessibilityHidden(true)
             VStack(spacing: 5) {
                 Text("Wohin möchtest du fahren?")
                     .font(.headline)
@@ -648,11 +664,13 @@ struct ConnectionsView: View {
     private var connectionsList: some View {
         VStack(spacing: 12) {
             ForEach(filteredTrips) { trip in
-                TripCard(trip: trip)
-                    .onTapGesture {
-                        guard !trip.legs.isEmpty else { return }
-                        selectedTrip = trip
-                    }
+                Button {
+                    guard !trip.legs.isEmpty else { return }
+                    selectedTrip = trip
+                } label: {
+                    TripCard(trip: trip)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -687,6 +705,7 @@ struct ConnectionsView: View {
             .foregroundColor(AppTheme.muted)
         }
         .disabled(graphQLService.isLoading)
+        .accessibilityHint(earlier ? "Lädt Verbindungen eine Stunde früher" : "Lädt Verbindungen eine Stunde später")
         .padding(.horizontal)
         .padding(.bottom, earlier ? 0 : 8)
     }

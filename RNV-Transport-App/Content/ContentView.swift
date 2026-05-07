@@ -64,6 +64,7 @@ struct ContentView: View {
                 .tag(3)
         }
         .tint(AppTheme.primaryColor)
+        .dynamicTypeSize(.xSmall ... .accessibility2)
         .onAppear {
             #if DEBUG
             print("🔍 [xcconfig] CLIENT_ID: \(Bundle.main.object(forInfoDictionaryKey: "RNV_CLIENT_ID") ?? "❌ NIL")")
@@ -142,6 +143,13 @@ struct AppTheme {
     static func surfaceStrongAdaptive(_ s: ColorScheme) -> Color { s == .dark ? Color(hex: "#3c3836") : surfaceStrong }
     static func hairlineAdaptive(_ s: ColorScheme) -> Color { s == .dark ? Color(hex: "#44403c") : hairline }
     static func inkAdaptive(_ s: ColorScheme) -> Color { s == .dark ? onDark : ink }
+    // Contrast-adaptive muted (WCAG AA: ≥4.5:1)
+    static func mutedAdaptive(_ s: ColorScheme, contrast: ColorSchemeContrast = .standard) -> Color {
+        if contrast == .increased {
+            return s == .dark ? Color(hex: "#c8c2bc") : Color(hex: "#565049")
+        }
+        return s == .dark ? Color(hex: "#a8a29e") : muted
+    }
 }
 
 // MARK: - Color(hex:) initializer
