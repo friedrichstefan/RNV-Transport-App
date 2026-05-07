@@ -163,42 +163,79 @@ struct StationPickerView: View {
                 // Datum & Uhrzeit
                 dateTimeSection
 
-                // Standort-Button
+                // Standort-Buttons
                 if locationManager.location != nil {
-                    Button(action: loadNearbyStations) {
-                        HStack(spacing: 14) {
-                            ZStack {
-                                Circle()
-                                    .fill(AppTheme.surfaceStrong)
-                                    .frame(width: 44, height: 44)
-                                Image(systemName: "location.fill")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(AppTheme.primaryColor)
+                    VStack(spacing: 0) {
+                        Button {
+                            Task { await selectNearestStation() }
+                        } label: {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(AppTheme.surfaceStrong)
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "location.fill")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(AppTheme.primaryColor)
+                                }
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Nächste Haltestelle")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundColor(.primary)
+                                    Text("Kürzeste Haltestelle automatisch wählen")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(AppTheme.primaryColor.opacity(0.7))
                             }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("In der Nähe")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(.primary)
-                                Text("Haltestellen um deinen Standort")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary.opacity(0.4))
+                            .padding(14)
                         }
-                        .padding(14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(AppTheme.surfaceCardAdaptive(colorScheme))
-                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
-                        )
+                        .buttonStyle(.plain)
+
+                        Divider()
+                            .padding(.leading, 72)
+
+                        Button(action: loadNearbyStations) {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(AppTheme.surfaceStrong)
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "list.bullet")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(AppTheme.primaryColor)
+                                }
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("In der Nähe")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundColor(.primary)
+                                    Text("Alle Haltestellen in der Umgebung")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary.opacity(0.4))
+                            }
+                            .padding(14)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
+                    )
                 }
 
                 // Bekannte Stationen für Schnellzugriff
@@ -594,6 +631,30 @@ struct StationPickerView: View {
                 print("   • \(station.longName) (globalID: \(station.globalID))")
             }
             #endif
+        }
+    }
+
+    private func selectNearestStation() async {
+        guard let location = locationManager.location else { return }
+        guard let accessToken = authService.accessToken else { return }
+
+        isSearchingQuickStation = true
+
+        await graphQLService.searchStations(
+            lat: location.latitude,
+            lon: location.longitude,
+            accessToken: accessToken
+        )
+
+        if let nearest = graphQLService.stations.first {
+            #if DEBUG
+            print("📍 [StationPicker] Nächste Haltestelle: \(nearest.longName)")
+            #endif
+            isSearchingQuickStation = false
+            selectAndDismiss(nearest)
+        } else {
+            isSearchingQuickStation = false
+            loadNearbyStations()
         }
     }
 

@@ -156,6 +156,7 @@ class AuthService: ObservableObject {
                     self.isAuthenticated = true
                     self.isAuthenticating = false
                     self.authError = nil
+                    PhoneConnectivityManager.shared.pushCredentialsToWatch(token: token, tokenExpiry: expiry)
                     #if DEBUG
                     print("✅ [AUTH] Anmeldung erfolgreich. Token läuft ab um: \(expiry)")
                     #endif
