@@ -30,7 +30,7 @@ struct StationPickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(colorScheme == .dark ? .black : .systemGroupedBackground)
+                AppTheme.canvasAdaptive(colorScheme)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -140,12 +140,12 @@ struct StationPickerView: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(colorScheme == .dark ? .systemGray5 : .systemBackground))
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(
-                        isSearchFocused ? AppTheme.primaryColor.opacity(0.5) : Color.secondary.opacity(0.15),
+                        isSearchFocused ? AppTheme.primary.opacity(0.5) : AppTheme.hairlineAdaptive(colorScheme),
                         lineWidth: isSearchFocused ? 1.5 : 1
                     )
             )
@@ -165,7 +165,7 @@ struct StationPickerView: View {
                         HStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(AppTheme.primaryColor.opacity(0.12))
+                                    .fill(AppTheme.surfaceStrong)
                                     .frame(width: 44, height: 44)
                                 Image(systemName: "location.fill")
                                     .font(.system(size: 18, weight: .semibold))
@@ -190,7 +190,8 @@ struct StationPickerView: View {
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                                .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
                         )
                     }
                     .buttonStyle(.plain)
@@ -242,7 +243,8 @@ struct StationPickerView: View {
                         }
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                                .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
                         )
                     }
                 }
@@ -306,7 +308,8 @@ struct StationPickerView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
             )
         }
     }
@@ -410,7 +413,8 @@ struct StationPickerView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
+                    .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
                     .padding(.horizontal, 16)
             )
             .padding(.bottom, 30)
@@ -424,7 +428,7 @@ struct StationPickerView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AppTheme.primaryColor.opacity(0.1))
+                    .fill(AppTheme.surfaceStrong)
                     .frame(width: 36, height: 36)
                 Image(systemName: "tram.fill")
                     .font(.system(size: 16))
@@ -438,9 +442,6 @@ struct StationPickerView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                Text(station.globalID)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.secondary.opacity(0.5))
             }
 
             Spacer()

@@ -19,28 +19,30 @@ class AuthService: ObservableObject {
     /// Laufende Authentifizierungs-Task – verhindert parallele Token-Requests
     private var activeAuthTask: Task<Void, Never>?
 
-    // MARK: - Konfiguration (sicher, kein fatalError)
+    // MARK: - Konfiguration (verschlüsselt)
+
+    private var configManager = SecureConfigurationManager.shared
 
     private var clientID: String? {
-        guard let id = Bundle.main.object(forInfoDictionaryKey: "RNV_CLIENT_ID") as? String,
+        guard let id = configManager.clientID,
               !id.isEmpty, !id.hasPrefix("$(") else { return nil }
         return id
     }
 
     private var clientSecret: String? {
-        guard let secret = Bundle.main.object(forInfoDictionaryKey: "RNV_CLIENT_SECRET") as? String,
+        guard let secret = configManager.clientSecret,
               !secret.isEmpty, !secret.hasPrefix("$(") else { return nil }
         return secret
     }
 
     private var tenantID: String? {
-        guard let tenant = Bundle.main.object(forInfoDictionaryKey: "RNV_TENANT_ID") as? String,
+        guard let tenant = configManager.tenantID,
               !tenant.isEmpty, !tenant.hasPrefix("$(") else { return nil }
         return tenant
     }
 
     private var resource: String? {
-        guard let res = Bundle.main.object(forInfoDictionaryKey: "RNV_RESOURCE") as? String,
+        guard let res = configManager.resource,
               !res.isEmpty, !res.hasPrefix("$(") else { return nil }
         return res
     }
@@ -96,19 +98,19 @@ class AuthService: ObservableObject {
 
         // Konfiguration prüfen
         guard let id = clientID else {
-            setError("RNV_CLIENT_ID ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_CLIENT_ID ist nicht konfiguriert oder konnte nicht entschlüsselt werden.")
             return
         }
         guard let secret = clientSecret else {
-            setError("RNV_CLIENT_SECRET ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_CLIENT_SECRET ist nicht konfiguriert oder konnte nicht entschlüsselt werden.")
             return
         }
         guard let tenant = tenantID else {
-            setError("RNV_TENANT_ID ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_TENANT_ID ist nicht konfiguriert oder konnte nicht entschlüsselt werden.")
             return
         }
         guard let res = resource else {
-            setError("RNV_RESOURCE ist nicht konfiguriert. Überprüfe die .xcconfig-Datei.")
+            setError("RNV_RESOURCE ist nicht konfiguriert oder konnte nicht entschlüsselt werden.")
             return
         }
 

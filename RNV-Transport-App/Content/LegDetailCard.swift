@@ -15,6 +15,7 @@ struct TimedLegCard: View {
     let isFirst: Bool
     let isLast: Bool
 
+    @State private var isExpanded = false
     @Environment(\.colorScheme) private var colorScheme
     private let formatter = DateFormattingHelper.shared
 
@@ -46,9 +47,9 @@ struct TimedLegCard: View {
                     )
                 }
 
-                // Fahrtdauer-Indikator
-                if let dep = leg.departureTime, let arr = leg.arrivalTime {
-                    durationIndicator(dep: dep, arr: arr)
+                // Zwischenhalte
+                if !leg.intermediateStops.isEmpty {
+                    intermediateStopsSection
                 }
 
                 // Ankunft
@@ -66,8 +67,9 @@ struct TimedLegCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(colorScheme == .dark ? .systemGray6 : .systemBackground))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.25 : 0.06), radius: 6, y: 3)
+                .fill(AppTheme.surfaceCardAdaptive(colorScheme))
+                .shadow(color: AppTheme.shadowColor(), radius: 6, y: 3)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
         )
     }
 
@@ -78,7 +80,7 @@ struct TimedLegCard: View {
             // Obere Verbindungslinie (wenn nicht erster Leg)
             if !isFirst {
                 Rectangle()
-                    .fill(Color(.systemGray4))
+                    .fill(AppTheme.hairlineStrong)
                     .frame(width: 2, height: 12)
             } else {
                 Color.clear.frame(width: 2, height: 12)
@@ -103,7 +105,7 @@ struct TimedLegCard: View {
             // Untere Verbindungslinie (wenn nicht letzter Leg)
             if !isLast {
                 Rectangle()
-                    .fill(Color(.systemGray4))
+                    .fill(AppTheme.hairlineStrong)
                     .frame(width: 2, height: 12)
             } else {
                 Color.clear.frame(width: 2, height: 12)
@@ -130,7 +132,7 @@ struct TimedLegCard: View {
             .background(
                 Capsule()
                     .fill(isSBahn
-                          ? Color(colorScheme == .dark ? .systemGray5 : .white)
+                          ? AppTheme.surfaceCardAdaptive(colorScheme)
                           : lineColor)
                     .overlay(
                         isSBahn ? Capsule().stroke(Color.green, lineWidth: 1.5) : nil
@@ -148,6 +150,92 @@ struct TimedLegCard: View {
                 }
                 .foregroundColor(.secondary)
             }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Intermediate Stops
+
+    private var intermediateStopsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    // Gepunktete Linie als visueller Indikator
+                    VStack(spacing: 3) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            Circle()
+                                .fill(lineColor.opacity(0.45))
+                                .frame(width: 4, height: 4)
+                        }
+                    }
+                    .frame(width: 48, alignment: .center)
+
+                    Text("\(leg.intermediateStops.count) Zwischenhalte")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.muted)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(AppTheme.mutedSoft)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(leg.intermediateStops.enumerated()), id: \.offset) { _, stop in
+                        intermediateStopRow(stop)
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func intermediateStopRow(_ stop: IntermediateStop) -> some View {
+        let delay: Int? = {
+            guard let est = stop.estimatedTime else { return nil }
+            return formatter.calculateDelay(timetabled: stop.scheduledTime, estimated: est)
+        }()
+        let hasDelay = (delay ?? 0) > 0
+
+        HStack(spacing: 10) {
+            VStack(alignment: .trailing, spacing: 1) {
+                if hasDelay, let est = stop.estimatedTime {
+                    Text(formatter.formatTime(stop.scheduledTime))
+                        .font(.caption2)
+                        .foregroundColor(AppTheme.mutedSoft)
+                        .strikethrough(true, color: AppTheme.mutedSoft)
+                    Text(formatter.formatTime(est))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.red)
+                } else {
+                    Text(formatter.formatTime(stop.scheduledTime))
+                        .font(.caption)
+                        .foregroundColor(AppTheme.muted)
+                }
+            }
+            .frame(width: 48, alignment: .trailing)
+
+            Circle()
+                .fill(lineColor.opacity(0.35))
+                .frame(width: 6, height: 6)
+
+            Text(stop.name)
+                .font(.caption)
+                .foregroundColor(AppTheme.muted)
+                .lineLimit(1)
 
             Spacer()
         }
@@ -222,22 +310,6 @@ struct TimedLegCard: View {
         }
     }
 
-    // MARK: - Duration Indicator
-
-    @ViewBuilder
-    private func durationIndicator(dep: String, arr: String) -> some View {
-        let duration = formatter.calculateDuration(start: dep, end: arr)
-
-        HStack(spacing: 6) {
-            Image(systemName: "clock")
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-            Text("Fahrzeit: \(duration)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(.leading, 58)
-    }
 }
 
 // MARK: - Transfer Connector (Umstieg / Fußweg)
@@ -275,7 +347,7 @@ struct TransferConnector: View {
             // Timeline-Verbindung
             VStack(spacing: 0) {
                 Rectangle()
-                    .fill(Color(.systemGray4))
+                    .fill(AppTheme.hairlineStrong)
                     .frame(width: 2)
                     .frame(maxHeight: .infinity)
             }
@@ -479,7 +551,7 @@ struct TripRouteSummary: View {
         .padding(.vertical, 5)
         .background(
             Capsule()
-                .fill(isSBahn ? Color(colorScheme == .dark ? .systemGray5 : .white) : lineColor)
+                .fill(isSBahn ? AppTheme.surfaceCardAdaptive(colorScheme) : lineColor)
                 .overlay(isSBahn ? Capsule().stroke(Color.green, lineWidth: 1.5) : nil)
         )
     }
@@ -491,7 +563,7 @@ struct TripRouteSummary: View {
         HStack(spacing: 2) {
             ForEach(0..<3, id: \.self) { _ in
                 Circle()
-                    .fill(Color(.systemGray3))
+                    .fill(AppTheme.hairlineStrong)
                     .frame(width: 3, height: 3)
             }
             Image(systemName: isWalk ? "figure.walk" : "arrow.triangle.swap")
@@ -499,7 +571,7 @@ struct TripRouteSummary: View {
                 .foregroundColor(.secondary)
             ForEach(0..<3, id: \.self) { _ in
                 Circle()
-                    .fill(Color(.systemGray3))
+                    .fill(AppTheme.hairlineStrong)
                     .frame(width: 3, height: 3)
             }
         }

@@ -70,6 +70,11 @@ class SecureGraphQLService: GraphQLService {
             print("📡 [SECURE_GQL] Response Status: \(httpResponse.statusCode)")
             #endif
             guard (200...299).contains(httpResponse.statusCode) else {
+                #if DEBUG
+                if let body = String(data: data, encoding: .utf8) {
+                    print("❌ [SECURE_GQL] Error body (\(httpResponse.statusCode)): \(body)")
+                }
+                #endif
                 throw GraphQLError(message: "HTTP-Fehler: \(httpResponse.statusCode)")
             }
         }

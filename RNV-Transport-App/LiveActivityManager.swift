@@ -29,13 +29,13 @@ class LiveActivityManager: ObservableObject {
     private var notificationObservers: [Any] = []
 
     /// BGTask Identifier – muss auch in Info.plist unter BGTaskSchedulerPermittedIdentifiers stehen
-    static let backgroundTaskIdentifier = "com.stefanfriedrich.rnvapp.liveactivity.refresh"
+    nonisolated static let backgroundTaskIdentifier = "com.stefanfriedrich.rnvapp.liveactivity.refresh"
 
     // MARK: - Private Helper to access LiveActivityState
 
     /// Wrapper that resolves `LiveActivityState` at the call‑site so that the
     /// compiler never has to look it up at the top level of this file.
-    nonisolated private static var activityState: LiveActivityState { LiveActivityState.shared }
+    private static var activityState: LiveActivityState { LiveActivityState.shared }
     
     // MARK: - Initialization
     
@@ -51,14 +51,18 @@ class LiveActivityManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleDidEnterBackground()
+            Task { @MainActor [weak self] in
+                self?.handleDidEnterBackground()
+            }
         }
         let fgObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleWillEnterForeground()
+            Task { @MainActor [weak self] in
+                self?.handleWillEnterForeground()
+            }
         }
         notificationObservers = [bgObserver, fgObserver]
     }
@@ -116,7 +120,7 @@ class LiveActivityManager: ObservableObject {
     }
 
     /// Führt Phase-Updates für alle aktiven Activities im Hintergrund durch
-    nonisolated private static func performBackgroundUpdate() async {
+    @MainActor private static func performBackgroundUpdate() async {
         let activeTrips = activityState.getAllActiveTrips()
         guard !activeTrips.isEmpty else { return }
 
@@ -303,7 +307,7 @@ class LiveActivityManager: ObservableObject {
             let widgetData = Self.convertTripToWidgetData(trip)
             Self.activityState.saveTripDataForWidget(widgetData)
             
-            await startAutoUpdates(for: trip)
+            startAutoUpdates(for: trip)
 
             // Background Task planen für Updates wenn App nicht aktiv ist
             Self.scheduleBackgroundTask()
@@ -328,7 +332,7 @@ class LiveActivityManager: ObservableObject {
     /// Berechnet den nächsten Zeitpunkt, an dem iOS die Activity neu rendern soll.
     /// Das ist der Schlüssel: staleDate sorgt dafür, dass iOS die Activity genau
     /// zum Zeitpunkt des Phasenwechsels aktualisiert.
-    nonisolated static func calculateNextStaleDate(
+    static func calculateNextStaleDate(
         departureTimeISO: String,
         arrivalTimeISO: String,
         delay: Int?,
@@ -390,7 +394,7 @@ class LiveActivityManager: ObservableObject {
             return
         }
         
-        let activityState = await activity.activityState
+        let activityState = activity.activityState
         guard activityState != .dismissed && activityState != .ended else {
             updateTimers[trip.id.uuidString]?.invalidate()
             updateTimers.removeValue(forKey: trip.id.uuidString)

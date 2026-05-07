@@ -18,7 +18,7 @@
                BlueprintIdentifier = "395F20A62F128DB500BC7030"
                BuildableName = "RNVLiveActivityExtension.appex"
                BlueprintName = "RNVLiveActivityExtension"
-               ReferencedContainer = "container:RNV-Transport-App.xcodeproj">
+               ReferencedContainer = "container:Mannheim O&#x308;PNV.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -32,7 +32,7 @@
                BlueprintIdentifier = "395F1FD42F11B2B100BC7030"
                BuildableName = "RNV-Transport-App.app"
                BlueprintName = "RNV-Transport-App"
-               ReferencedContainer = "container:RNV-Transport-App.xcodeproj">
+               ReferencedContainer = "container:Mannheim O&#x308;PNV.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -63,7 +63,7 @@
             BlueprintIdentifier = "395F1FD42F11B2B100BC7030"
             BuildableName = "RNV-Transport-App.app"
             BlueprintName = "RNV-Transport-App"
-            ReferencedContainer = "container:RNV-Transport-App.xcodeproj">
+            ReferencedContainer = "container:Mannheim O&#x308;PNV.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <EnvironmentVariables>
@@ -99,7 +99,7 @@
             BlueprintIdentifier = "395F1FD42F11B2B100BC7030"
             BuildableName = "RNV-Transport-App.app"
             BlueprintName = "RNV-Transport-App"
-            ReferencedContainer = "container:RNV-Transport-App.xcodeproj">
+            ReferencedContainer = "container:Mannheim O&#x308;PNV.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
