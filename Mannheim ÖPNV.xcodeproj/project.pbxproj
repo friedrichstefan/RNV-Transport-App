@@ -15,7 +15,6 @@
 		395F20AC2F128DB500BC7030 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20AB2F128DB500BC7030 /* SwiftUI.framework */; };
 		395F20BB2F128DB700BC7030 /* RNVLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		39E6B1792FACFE4900530110 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47AAB2A72D7597E0244DDB50 /* WatchConnectivity.framework */; };
-		39E6B17A2FACFE4900530110 /* WatchConnectivity.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 47AAB2A72D7597E0244DDB50 /* WatchConnectivity.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		48B707E0FE2F06C7DF6A565E /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 24A9B46C77197C343CC5C33E /* SwiftUI.framework */; };
 		57EDFA3C7F77AE674225DD28 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4AC99C37BEC617215A2FDE2C /* WatchConnectivity.framework */; };
 		7DBDB4AD9D0DA448A37C48E9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F52290A6F7215AE6A17DA1BC /* Foundation.framework */; };
@@ -57,7 +56,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				39E6B17A2FACFE4900530110 /* WatchConnectivity.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
