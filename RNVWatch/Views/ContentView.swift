@@ -20,3 +20,22 @@ struct ContentView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Aktive Fahrt") {
+    let dm = WatchDataManager()
+    dm.activeTrip = WatchDemoData.activeTrip
+    return ContentView()
+        .environmentObject(dm)
+        .environmentObject(WatchConnectivityManager.shared)
+}
+
+#Preview("Geplante Fahrten") {
+    let dm = WatchDataManager()
+    dm.savedTrips = WatchDemoData.savedTrips
+    return ContentView()
+        .environmentObject(dm)
+        .environmentObject(WatchConnectivityManager.shared)
+}
+#endif
+

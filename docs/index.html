@@ -331,6 +331,25 @@
       border-radius: 4px;
     }
 
+    /* ── Watch Mockup ─────────────────────────────── */
+    .watch-img {
+      width: 200px;
+      height: auto;
+      display: block;
+      filter:
+        drop-shadow(0 24px 48px rgba(0,0,0,.4))
+        drop-shadow(0 5px 16px rgba(0,0,0,.2));
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .carousel--watch .carousel-track { height: 420px; }
+
+    @media (max-width: 640px) {
+      .carousel--watch .carousel-track { height: 360px; }
+      .watch-img { width: 170px; }
+    }
+
     /* ── Features ─────────────────────────────────── */
     .features-grid {
       display: grid;
@@ -503,6 +522,7 @@
     </a>
     <ul>
       <li><a href="#features">Features</a></li>
+      <li><a href="#applewatch">Apple Watch</a></li>
       <li><a href="datenschutz.html">Datenschutz</a></li>
       <li><a href="#support">Support</a></li>
       <li><a href="impressum.html">Impressum</a></li>
@@ -565,6 +585,51 @@
   </div>
 </section>
 
+<!-- ── Apple Watch ─────────────────────────────────── -->
+<section id="applewatch">
+  <div class="container">
+    <div class="hero-eyebrow" style="margin-bottom:20px">
+      <span>⌚</span> Update 2.0 – Jetzt verfügbar
+    </div>
+    <h2>Neu: Die Apple Watch App.</h2>
+    <p style="max-width:560px">
+      Mit dem neuesten Update kommt ÖPNV Mannheim auch auf die Apple Watch.
+      Abfahrten checken, aktive Fahrten verfolgen und geplante Verbindungen abrufen –
+      alles direkt am Handgelenk, ohne das iPhone zu entsperren.
+    </p>
+
+    <div class="privacy-badges" style="margin: 20px 0 0">
+      <span class="badge"><span class="dot" style="background:#3b82f6"></span> Live-Abfahrten</span>
+      <span class="badge"><span class="dot" style="background:#3b82f6"></span> Aktive Fahrten im Blick</span>
+      <span class="badge"><span class="dot" style="background:#3b82f6"></span> Geplante Verbindungen</span>
+      <span class="badge"><span class="dot" style="background:#3b82f6"></span> Zifferblatt-Komplikation</span>
+    </div>
+
+    <div class="carousel carousel--watch" id="watchCarousel">
+      <div class="carousel-track" id="watchCarouselTrack">
+
+        <div class="carousel-slide" data-index="0">
+          <img src="screenshots/Apple watch S11.png" class="watch-img" alt="Aktive Fahrt auf Apple Watch Series 11" draggable="false" />
+        </div>
+
+        <div class="carousel-slide" data-index="1">
+          <img src="screenshots/Ultra 3 Natural Blue.png" class="watch-img" alt="Abfahrten auf Apple Watch Ultra 3" draggable="false" />
+        </div>
+
+        <div class="carousel-slide" data-index="2">
+          <img src="screenshots/Ultra 3 .png" class="watch-img" alt="Geplante Fahrten auf Apple Watch Ultra 3" draggable="false" />
+        </div>
+
+      </div>
+      <div class="carousel-dots" id="watchCarouselDots">
+        <button class="dot" aria-label="Watch Screenshot 1"></button>
+        <button class="dot" aria-label="Watch Screenshot 2"></button>
+        <button class="dot" aria-label="Watch Screenshot 3"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── Features ────────────────────────────────────── -->
 <section id="features">
   <div class="container">
@@ -603,6 +668,12 @@
       </div>
 
       <div class="feature-card">
+        <div class="feature-icon">⌚</div>
+        <h3>Apple Watch App</h3>
+        <p>Abfahrten und aktive Fahrten direkt am Handgelenk – auch mit Zifferblatt-Komplikation für den schnellen Blick.</p>
+      </div>
+
+      <div class="feature-card">
         <div class="feature-icon">⚡</div>
         <h3>Schnell & offline-fähig</h3>
         <p>Zuletzt genutzte Haltestellen werden gespeichert. Auch ohne Verbindung zeigt die App noch deine letzten Daten.</p>
@@ -621,7 +692,7 @@
       <div class="info-card">
         <h3>📱 Systemvoraussetzungen</h3>
         <p>iOS 16.2 oder neuer. Optimiert für iPhone mit Dynamic Island (iPhone 14 Pro und neuer).</p>
-        <p>Verfügbar auf iPhone. Keine iPad-Unterstützung.</p>
+        <p>Apple Watch App erfordert watchOS 10 oder neuer. Keine iPad-Unterstützung.</p>
       </div>
       <div class="info-card">
         <h3>🔗 Datenquelle</h3>
@@ -759,6 +830,85 @@
   });
 
   // Mouse drag (desktop)
+  var mouseStartX = 0;
+  var mouseDown = false;
+  track.addEventListener('mousedown', function (e) { mouseStartX = e.clientX; mouseDown = true; });
+  track.addEventListener('mouseup', function (e) {
+    if (!mouseDown) return;
+    mouseDown = false;
+    var dx = e.clientX - mouseStartX;
+    if (Math.abs(dx) > 40) {
+      goTo(dx < 0 ? (current + 1) % total : (current - 1 + total) % total);
+      startTimer();
+    }
+  });
+  track.addEventListener('mouseleave', function () { mouseDown = false; });
+
+  goTo(0);
+  startTimer();
+})();
+
+(function () {
+  var slides  = Array.from(document.querySelectorAll('#watchCarouselTrack .carousel-slide'));
+  var dots    = Array.from(document.querySelectorAll('#watchCarouselDots .dot'));
+  var track   = document.getElementById('watchCarouselTrack');
+  var total   = slides.length;
+  var current = 0;
+  var timer;
+
+  function goTo(index) {
+    var prev = (index - 1 + total) % total;
+    var next = (index + 1) % total;
+    slides.forEach(function (s, i) {
+      s.classList.remove('is-active', 'is-prev', 'is-next');
+      if (i === index) s.classList.add('is-active');
+      else if (i === prev) s.classList.add('is-prev');
+      else if (i === next) s.classList.add('is-next');
+    });
+    dots.forEach(function (d, i) {
+      d.classList.toggle('active', i === index);
+    });
+    current = index;
+  }
+
+  function advance() { goTo((current + 1) % total); }
+
+  function startTimer() {
+    clearInterval(timer);
+    timer = setInterval(advance, 6000);
+  }
+
+  dots.forEach(function (d, i) {
+    d.addEventListener('click', function () { goTo(i); startTimer(); });
+  });
+
+  var startX = 0;
+  var startY = 0;
+  var dragging = false;
+
+  track.addEventListener('touchstart', function (e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dragging = true;
+  }, { passive: true });
+
+  track.addEventListener('touchmove', function (e) {
+    if (!dragging) return;
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (Math.abs(dx) > Math.abs(dy)) e.preventDefault();
+  }, { passive: false });
+
+  track.addEventListener('touchend', function (e) {
+    if (!dragging) return;
+    dragging = false;
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) {
+      goTo(dx < 0 ? (current + 1) % total : (current - 1 + total) % total);
+      startTimer();
+    }
+  });
+
   var mouseStartX = 0;
   var mouseDown = false;
   track.addEventListener('mousedown', function (e) { mouseStartX = e.clientX; mouseDown = true; });

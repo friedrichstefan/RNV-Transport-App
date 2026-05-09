@@ -57,6 +57,16 @@ final class PhoneConnectivityManager: NSObject {
 
         try? WCSession.default.updateApplicationContext(context)
     }
+
+    /// Benachrichtigt die Watch-App, dass sich Fahrtdaten geändert haben.
+    func notifyTripUpdate() {
+        guard WCSession.isSupported(),
+              WCSession.default.activationState == .activated,
+              WCSession.default.isReachable
+        else { return }
+
+        WCSession.default.sendMessage(["tripDataDidChange": true], replyHandler: nil, errorHandler: nil)
+    }
 }
 
 // MARK: - WCSessionDelegate

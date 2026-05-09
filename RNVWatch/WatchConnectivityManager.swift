@@ -22,6 +22,8 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     @Published var lastError: String? = nil
     @Published var isReachable = false
 
+    var onContextUpdated: (() -> Void)? = nil
+
     private override init() {
         super.init()
         guard WCSession.isSupported() else { return }
@@ -32,6 +34,17 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     // MARK: - Abfahrten anfragen
 
     func requestDepartures(stationID: String, stationName: String) {
+        #if targetEnvironment(simulator) && DEBUG
+        isLoading = true
+        lastError = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            await MainActor.run {
+                self.departures = WatchDemoData.departures
+                self.isLoading  = false
+            }
+        }
+        #else
         if WCSession.default.isReachable {
             requestViaiPhone(stationID: stationID, stationName: stationName)
         } else if WatchDirectService.shared.hasCredentials {
@@ -39,6 +52,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         } else {
             lastError = "iPhone nicht erreichbar"
         }
+        #endif
     }
 
     private func requestViaiPhone(stationID: String, stationName: String) {
@@ -102,6 +116,14 @@ extension WatchConnectivityManager: WCSessionDelegate {
         }
     }
 
+    // Sofort-Benachrichtigung vom iPhone wenn sich Fahrtdaten geändert haben
+    nonisolated func session(_ session: WCSession,
+                             didReceiveMessage message: [String: Any]) {
+        if message["tripDataDidChange"] != nil {
+            Task { @MainActor in self.onContextUpdated?() }
+        }
+    }
+
     // Kontextaktualisierungen vom iPhone annehmen (z.B. vorberechnete Abfahrten + Credentials)
     nonisolated func session(_ session: WCSession,
                              didReceiveApplicationContext applicationContext: [String: Any]) {
@@ -125,7 +147,10 @@ extension WatchConnectivityManager: WCSessionDelegate {
                 accessToken: creds["accessToken"] as? String,
                 tokenExpiry: creds["tokenExpiry"] as? TimeInterval
             )
-            Task { @MainActor in WatchDirectService.shared.saveCredentials(credentials) }
+            Task { @MainActor in
+                WatchDirectService.shared.saveCredentials(credentials)
+                self.onContextUpdated?()
+            }
         }
     }
 }

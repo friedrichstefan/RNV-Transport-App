@@ -10,15 +10,32 @@ class WatchDataManager: ObservableObject {
     @Published var lastRefresh: Date? = nil
 
     private let appGroupID = "group.com.stefanfriedrich.rnvapp"
+    private var refreshTimer: Timer? = nil
+
+    init() {
+        startAutoRefresh()
+    }
+
+    private func startAutoRefresh() {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refresh() }
+        }
+    }
 
     // MARK: - Laden
 
     func refresh() {
+        #if targetEnvironment(simulator) && DEBUG
+        activeTrip  = WatchDemoData.activeTrip
+        savedTrips  = WatchDemoData.savedTrips
+        lastRefresh = Date()
+        #else
         let defaults = UserDefaults(suiteName: appGroupID)
 
         activeTrip = loadActiveTrip(from: defaults)
         savedTrips = loadSavedTrips(from: defaults)
         lastRefresh = Date()
+        #endif
     }
 
     // MARK: - Aktive Fahrt

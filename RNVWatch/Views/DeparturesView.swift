@@ -157,3 +157,26 @@ private struct ErrorRow: View {
         .listRowBackground(Color.clear)
     }
 }
+
+#if DEBUG
+#Preview("Abfahrten") {
+    let conn = WatchConnectivityManager.shared
+    conn.departures = WatchDemoData.departures
+    return DeparturesView()
+        .environmentObject(conn)
+}
+
+#Preview("Laden") {
+    let conn = WatchConnectivityManager.shared
+    conn.isLoading = true
+    return DeparturesView()
+        .environmentObject(conn)
+}
+
+#Preview("Fehler") {
+    let conn = WatchConnectivityManager.shared
+    conn.lastError = "iPhone nicht erreichbar"
+    return DeparturesView()
+        .environmentObject(conn)
+}
+#endif

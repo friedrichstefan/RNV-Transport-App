@@ -78,7 +78,8 @@ class TripDataManager {
                             arrivalTime: leg.arrivalTime,
                             serviceName: leg.serviceName,
                             serviceType: leg.serviceType,
-                            destinationLabel: leg.destinationLabel
+                            destinationLabel: leg.destinationLabel,
+                            intermediateStopNames: leg.intermediateStops.isEmpty ? nil : leg.intermediateStops.map { $0.name }
                         )
                     }
                 )
@@ -232,4 +233,5 @@ struct TripLegData: Codable {
     let serviceName: String?
     let serviceType: String?
     let destinationLabel: String?
+    let intermediateStopNames: [String]?
 }

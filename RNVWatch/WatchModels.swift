@@ -49,6 +49,7 @@ struct TripLegData: Codable {
     let serviceName: String?
     let serviceType: String?
     let destinationLabel: String?
+    let intermediateStopNames: [String]?
 
     var isTimedLeg: Bool { legType == "timedLeg" }
 }
@@ -91,8 +92,9 @@ struct WatchDateHelper {
 
     private static let timeFmt: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "HH:mm"
-        f.locale = Locale(identifier: "de_DE")
+        f.timeZone = TimeZone.current
         return f
     }()
 

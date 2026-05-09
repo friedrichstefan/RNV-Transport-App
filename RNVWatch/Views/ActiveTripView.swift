@@ -41,7 +41,7 @@ private struct TripTrackingView: View {
                 Divider()
 
                 // Abfahrt / Ankunft
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Ab")
                             .font(.caption2)
@@ -53,6 +53,7 @@ private struct TripTrackingView: View {
                     Image(systemName: "arrow.right")
                         .font(.caption.bold())
                         .foregroundColor(.secondary)
+                        .padding(.horizontal, 20)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("An")
@@ -61,13 +62,11 @@ private struct TripTrackingView: View {
                         Text(WatchDateHelper.formatTime(trip.endTime))
                             .font(.system(.body, design: .monospaced))
                             .foregroundColor(.secondary)
+                        
                     }
-
+                    
                     Spacer()
-
-                    Text(WatchDateHelper.durationString(start: trip.startTime, end: trip.endTime))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    
                 }
 
                 // Countdown / Status
@@ -235,3 +234,18 @@ private struct RouteStopRow: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Aktive Fahrt") {
+    let dm = WatchDataManager()
+    dm.activeTrip = WatchDemoData.activeTrip
+    return ActiveTripView()
+        .environmentObject(dm)
+}
+
+#Preview("Keine Fahrt") {
+    let dm = WatchDataManager()
+    return ActiveTripView()
+        .environmentObject(dm)
+}
+#endif

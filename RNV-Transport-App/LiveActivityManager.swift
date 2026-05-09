@@ -306,6 +306,7 @@ class LiveActivityManager: ObservableObject {
             // Widget-Daten in UserDefaults speichern
             let widgetData = Self.convertTripToWidgetData(trip)
             Self.activityState.saveTripDataForWidget(widgetData)
+            PhoneConnectivityManager.shared.notifyTripUpdate()
             
             startAutoUpdates(for: trip)
 
@@ -467,6 +468,7 @@ class LiveActivityManager: ObservableObject {
         // Widget-Daten aktualisieren, damit Home-Screen-Widgets den neuesten Stand zeigen
         let widgetData = Self.convertTripToWidgetData(trip)
         Self.activityState.saveTripDataForWidget(widgetData)
+        PhoneConnectivityManager.shared.notifyTripUpdate()
 
         // Timer-Intervall für den nächsten Update
         let nextInterval = getUpdateInterval(
@@ -605,6 +607,7 @@ class LiveActivityManager: ObservableObject {
             }
             
             Self.activityState.setTripActive(tripId, isActive: false)
+            PhoneConnectivityManager.shared.notifyTripUpdate()
         }
         
         self.activeActivities.removeAll()
