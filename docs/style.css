@@ -318,6 +318,14 @@ nav.scrolled { background: rgba(250, 249, 248, 0.96); }
   box-shadow: inset 0 0 0 1px var(--c-hairline-solid);
 }
 
+.btn-instagram {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--c-hairline-solid);
+  padding: var(--sp-xs) var(--sp-sm);
+  line-height: 0;
+}
+.btn-instagram:hover { opacity: .7; }
+
 .btn-group { display: flex; gap: var(--sp-sm); flex-wrap: wrap; align-items: center; }
 
 /* App Store badge */
