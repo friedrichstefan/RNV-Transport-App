@@ -20,12 +20,12 @@
 		7DBDB4AD9D0DA448A37C48E9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F52290A6F7215AE6A17DA1BC /* Foundation.framework */; };
 		A0E86D8DA9A8B911527223AB /* WatchDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED490D419C9DBE03FAA21B4 /* WatchDataManager.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* WatchDirectService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* WatchDirectService.swift */; };
-		DD1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift */; };
 		AC15135173E7EB8E1FC05134 /* WatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3586F8F82591C327AC1184D9 /* WatchApp.swift */; };
 		B59AA62002E811D8BC48653B /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2E89EE46FAF298E6247B82 /* WatchConnectivityManager.swift */; };
 		B802ECD0D273B8378428D900 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF3FF46771BC4230A08B904E /* ContentView.swift */; };
 		C3836C4CBF30DE1186B4AC83 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FEB0BED9C1BB7BD41733D19 /* WatchModels.swift */; };
 		C711471A5C4F81491F9F7149 /* SavedTripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C1D454BD4A661DC5B81DDE /* SavedTripsView.swift */; };
+		DD1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift */; };
 		EBED6334CFBEED0A06A3FDAD /* ActiveTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F833CF806B9CB3374EC3D0 /* ActiveTripView.swift */; };
 /* End PBXBuildFile section */
 
@@ -440,14 +440,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = RNVWatch/RNVWatch.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = RNVWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Mannheim ÖPNV";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.stefanfriedrich.rnvapp.watch;
 				PRODUCT_NAME = RNVWatch;
 				SDKROOT = watchos;
@@ -596,7 +600,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = A4HCRKN53K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -649,7 +653,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = A4HCRKN53K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -771,14 +775,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = RNVWatch/RNVWatch.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = RNVWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Mannheim ÖPNV";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.stefanfriedrich.rnvapp.watch;
 				PRODUCT_NAME = RNVWatch;
 				SDKROOT = watchos;
