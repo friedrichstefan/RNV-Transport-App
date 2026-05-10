@@ -127,6 +127,8 @@ Füge die folgenden Keys zu deiner `Info.plist` hinzu, um den GPS-Zugriff zu erm
 
 Beiträge sind herzlich willkommen! Fühl dich frei, das Projekt zu **forken**, **Issues** zu erstellen oder **Pull Requests** mit Verbesserungen einzureichen. Jeder Beitrag hilft, die App besser zu machen!
 
+Bei Fragen oder Feedback: [delta.corelabs@gmail.com](mailto:delta.corelabs@gmail.com)
+
 ---
 
 ## 📄 License
@@ -138,7 +140,7 @@ Dieses Projekt ist unter der **MIT-Lizenz** lizenziert – siehe die [LICENSE](L
 # RNV Transport App (English) 🚌💨
 
 ## 🌐 Website
-**[https://i767513.github.io/RNV-Transport-App/](https://i767513.github.io/RNV-Transport-App/)**
+**[https://friedrichstefan.github.io/RNV-Transport-App/](https://friedrichstefan.github.io/RNV-Transport-App/)**
 
 ---
 
@@ -256,6 +258,8 @@ Add the following keys to your `Info.plist` to enable GPS access:
 
 Contributions are welcome!  
 Feel free to **fork** the project, open **issues**, or submit **pull requests** with improvements.
+
+For questions or feedback: [delta.corelabs@gmail.com](mailto:delta.corelabs@gmail.com)
 
 ---
 
