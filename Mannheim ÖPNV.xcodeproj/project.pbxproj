@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		2810C6DEC9BFB58944B8614C /* DeparturesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93CBB7CE42CD42C1D4DA5DE4 /* DeparturesView.swift */; };
+		3D35824A9C154C899F753900 /* ConnectionSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */; };
+		CC11DD22EE33FF4400112233 /* WatchStationPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD22EE33FF440011223344CC /* WatchStationPickerView.swift */; };
 		39111F902F1C61A0002FB482 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8F2F1C61A0002FB482 /* .gitignore */; };
 		395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FE92F11B3F700BC7030 /* Apollo */; };
 		395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FEB2F11B3F700BC7030 /* ApolloAPI */; };
@@ -25,6 +27,7 @@
 		B802ECD0D273B8378428D900 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF3FF46771BC4230A08B904E /* ContentView.swift */; };
 		C3836C4CBF30DE1186B4AC83 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FEB0BED9C1BB7BD41733D19 /* WatchModels.swift */; };
 		C711471A5C4F81491F9F7149 /* SavedTripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C1D454BD4A661DC5B81DDE /* SavedTripsView.swift */; };
+		CC000003000000000000000C /* RNVWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = F50FC19EC7F5F96CA4125341 /* RNVWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		DD1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift */; };
 		EBED6334CFBEED0A06A3FDAD /* ActiveTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F833CF806B9CB3374EC3D0 /* ActiveTripView.swift */; };
 /* End PBXBuildFile section */
@@ -36,6 +39,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 395F20A62F128DB500BC7030;
 			remoteInfo = RNVLiveActivityExtension;
+		};
+		BB000001000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 395F1FCD2F11B2B000BC7030 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 80B5293081A328395ABFE9D5;
+			remoteInfo = RNVWatch;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -61,6 +71,26 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		39EADE2C2FB21A2800231909 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD000004000000000000000D /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				CC000003000000000000000C /* RNVWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -81,6 +111,8 @@
 		4FEB0BED9C1BB7BD41733D19 /* WatchModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchModels.swift; sourceTree = "<group>"; };
 		8A6B3F591AE6C55A16B2746B /* RNVWatch.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RNVWatch.entitlements; sourceTree = "<group>"; };
 		93CBB7CE42CD42C1D4DA5DE4 /* DeparturesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeparturesView.swift; sourceTree = "<group>"; };
+		F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConnectionSearchView.swift; sourceTree = "<group>"; };
+		DD22EE33FF440011223344CC /* WatchStationPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchStationPickerView.swift; sourceTree = "<group>"; };
 		9ED490D419C9DBE03FAA21B4 /* WatchDataManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchDataManager.swift; sourceTree = "<group>"; };
 		A8C1D454BD4A661DC5B81DDE /* SavedTripsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedTripsView.swift; sourceTree = "<group>"; };
 		C2F833CF806B9CB3374EC3D0 /* ActiveTripView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActiveTripView.swift; sourceTree = "<group>"; };
@@ -185,6 +217,8 @@
 				C2F833CF806B9CB3374EC3D0 /* ActiveTripView.swift */,
 				A8C1D454BD4A661DC5B81DDE /* SavedTripsView.swift */,
 				93CBB7CE42CD42C1D4DA5DE4 /* DeparturesView.swift */,
+				F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */,
+				DD22EE33FF440011223344CC /* WatchStationPickerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -270,12 +304,15 @@
 				395F1FD22F11B2B100BC7030 /* Frameworks */,
 				395F1FD32F11B2B100BC7030 /* Resources */,
 				395F20BC2F128DB700BC7030 /* Embed Foundation Extensions */,
+				DD000004000000000000000D /* Embed Watch Content */,
 				39E6B17B2FACFE4A00530110 /* Embed Frameworks */,
+				39EADE2C2FB21A2800231909 /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				395F20BA2F128DB700BC7030 /* PBXTargetDependency */,
+				BB000002000000000000000B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				395F1FD72F11B2B100BC7030 /* RNV-Transport-App */,
@@ -422,6 +459,8 @@
 				EBED6334CFBEED0A06A3FDAD /* ActiveTripView.swift in Sources */,
 				C711471A5C4F81491F9F7149 /* SavedTripsView.swift in Sources */,
 				2810C6DEC9BFB58944B8614C /* DeparturesView.swift in Sources */,
+				3D35824A9C154C899F753900 /* ConnectionSearchView.swift in Sources */,
+				CC11DD22EE33FF4400112233 /* WatchStationPickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -432,6 +471,11 @@
 			isa = PBXTargetDependency;
 			target = 395F20A62F128DB500BC7030 /* RNVLiveActivityExtension */;
 			targetProxy = 395F20B92F128DB700BC7030 /* PBXContainerItemProxy */;
+		};
+		BB000002000000000000000B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 80B5293081A328395ABFE9D5 /* RNVWatch */;
+			targetProxy = BB000001000000000000000A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -451,10 +495,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stefanfriedrich.rnvapp.watch;
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.Mannheim-Transportation.watchkitapp";
 				PRODUCT_NAME = RNVWatch;
 				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -600,7 +645,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = A4HCRKN53K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -621,7 +666,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.Mannheim-Transportation";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				RNV_APP_GROUP_ID = "$(RNV_APP_GROUP_ID)";
@@ -653,7 +698,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = A4HCRKN53K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -674,7 +719,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.Mannheim-Transportation";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				RNV_APP_GROUP_ID = "$(RNV_APP_GROUP_ID)";
@@ -786,10 +831,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stefanfriedrich.rnvapp.watch;
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "Stefan.Mannheim-Transportation.watchkitapp";
 				PRODUCT_NAME = RNVWatch;
 				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = 4;

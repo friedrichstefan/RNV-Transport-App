@@ -74,6 +74,23 @@ enum TripPhase: String, Codable {
     case arrived
 }
 
+// MARK: - Vordefinierte Haltestellen (geteilt zwischen Abfahrten- und Verbindungssuche)
+
+struct WatchStation: Identifiable, Hashable, Codable {
+    let id: String  // globalID
+    let name: String
+
+    static let all: [WatchStation] = [
+        WatchStation(id: "de:08222:115", name: "MA Hauptbahnhof"),
+        WatchStation(id: "de:08222:101", name: "MA Paradeplatz"),
+        WatchStation(id: "de:08222:110", name: "MA Wasserturm"),
+        WatchStation(id: "de:08222:117", name: "MA Hauptfriedhof"),
+        WatchStation(id: "de:08221:1",   name: "HD Hauptbahnhof"),
+        WatchStation(id: "de:08221:15",  name: "HD Bismarckplatz"),
+        WatchStation(id: "de:07311:100", name: "LU Hauptbahnhof"),
+    ]
+}
+
 // MARK: - Datum-Helfer
 
 struct WatchDateHelper {

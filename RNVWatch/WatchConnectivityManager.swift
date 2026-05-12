@@ -7,10 +7,19 @@ import Combine
 
 // Nachrichtentypen (müssen mit iPhone-Seite übereinstimmen)
 enum WatchMessage {
-    static let requestDepartures = "requestDepartures"
-    static let stationIDKey      = "stationID"
-    static let stationNameKey    = "stationName"
-    static let departuresKey     = "departures"
+    static let requestDepartures       = "requestDepartures"
+    static let stationIDKey            = "stationID"
+    static let stationNameKey          = "stationName"
+    static let departuresKey           = "departures"
+    static let requestConnections      = "requestConnections"
+    static let fromIDKey               = "fromID"
+    static let toIDKey                 = "toID"
+    static let fromNameKey             = "fromName"
+    static let toNameKey               = "toName"
+    static let connectionsKey          = "connections"
+    static let requestStationSearch    = "requestStationSearch"
+    static let searchQueryKey          = "searchQuery"
+    static let stationSearchResultsKey = "stationSearchResults"
 }
 
 @MainActor
@@ -21,6 +30,14 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     @Published var isLoading = false
     @Published var lastError: String? = nil
     @Published var isReachable = false
+
+    @Published var connectionResults: [TripData] = []
+    @Published var connectionsLoading = false
+    @Published var connectionsError: String? = nil
+
+    @Published var stationSearchResults: [WatchStation] = []
+    @Published var stationSearchLoading = false
+    @Published var stationSearchError: String? = nil
 
     var onContextUpdated: (() -> Void)? = nil
 
@@ -34,17 +51,6 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     // MARK: - Abfahrten anfragen
 
     func requestDepartures(stationID: String, stationName: String) {
-        #if targetEnvironment(simulator) && DEBUG
-        isLoading = true
-        lastError = nil
-        Task {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            await MainActor.run {
-                self.departures = WatchDemoData.departures
-                self.isLoading  = false
-            }
-        }
-        #else
         if WCSession.default.isReachable {
             requestViaiPhone(stationID: stationID, stationName: stationName)
         } else if WatchDirectService.shared.hasCredentials {
@@ -52,7 +58,83 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         } else {
             lastError = "iPhone nicht erreichbar"
         }
-        #endif
+    }
+
+    // MARK: - Stationssuche
+
+    func requestStationSearch(query: String) {
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+            stationSearchResults = []
+            return
+        }
+        guard WCSession.default.isReachable else {
+            stationSearchError = "iPhone nicht erreichbar"
+            return
+        }
+        stationSearchLoading = true
+        stationSearchError = nil
+
+        let msg: [String: Any] = [
+            WatchMessage.requestStationSearch: true,
+            WatchMessage.searchQueryKey: query
+        ]
+
+        WCSession.default.sendMessage(msg) { [weak self] reply in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.stationSearchLoading = false
+                if let rawData = reply[WatchMessage.stationSearchResultsKey] as? Data,
+                   let decoded = try? JSONDecoder().decode([WatchStation].self, from: rawData) {
+                    self.stationSearchResults = decoded
+                } else {
+                    self.stationSearchResults = []
+                }
+            }
+        } errorHandler: { [weak self] error in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.stationSearchLoading = false
+                self.stationSearchError = error.localizedDescription
+            }
+        }
+    }
+
+    // MARK: - Verbindungen anfragen
+
+    func requestConnections(fromID: String, toID: String, fromName: String, toName: String) {
+        guard WCSession.default.isReachable else {
+            connectionsError = "iPhone nicht erreichbar"
+            return
+        }
+        connectionsLoading = true
+        connectionsError = nil
+
+        let msg: [String: Any] = [
+            WatchMessage.requestConnections: true,
+            WatchMessage.fromIDKey: fromID,
+            WatchMessage.toIDKey: toID,
+            WatchMessage.fromNameKey: fromName,
+            WatchMessage.toNameKey: toName
+        ]
+
+        WCSession.default.sendMessage(msg) { [weak self] reply in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.connectionsLoading = false
+                if let rawData = reply[WatchMessage.connectionsKey] as? Data,
+                   let decoded = try? JSONDecoder().decode([TripData].self, from: rawData) {
+                    self.connectionResults = decoded
+                } else {
+                    self.connectionsError = "Keine Verbindungen gefunden"
+                }
+            }
+        } errorHandler: { [weak self] error in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.connectionsLoading = false
+                self.connectionsError = error.localizedDescription
+            }
+        }
     }
 
     private func requestViaiPhone(stationID: String, stationName: String) {
@@ -120,6 +202,14 @@ extension WatchConnectivityManager: WCSessionDelegate {
     nonisolated func session(_ session: WCSession,
                              didReceiveMessage message: [String: Any]) {
         if message["tripDataDidChange"] != nil {
+            Task { @MainActor in self.onContextUpdated?() }
+        }
+    }
+
+    // Verzögerte Benachrichtigung (wenn Watch beim Senden nicht erreichbar war)
+    nonisolated func session(_ session: WCSession,
+                             didReceiveUserInfo userInfo: [String: Any]) {
+        if userInfo["tripDataDidChange"] != nil {
             Task { @MainActor in self.onContextUpdated?() }
         }
     }

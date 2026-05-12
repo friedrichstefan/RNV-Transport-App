@@ -56,6 +56,8 @@ struct RNVLiveActivityLiveActivity: Widget {
                         delay: context.state.delay,
                         phase: context.state.phase,
                         tripId: context.attributes.tripId,
+                        nextTransferStopName: context.state.nextTransferStopName,
+                        nextTransferArrivalISO: context.state.nextTransferArrivalISO,
                         currentTime: Date()
                     )
                 }
@@ -113,6 +115,7 @@ struct RNVLiveActivityLiveActivity: Widget {
     RNVLiveActivityLiveActivity()
 } contentStates: {
     TripLiveActivityAttributes.ContentState.duringJourney
+    TripLiveActivityAttributes.ContentState.duringJourneyWithTransfer
     TripLiveActivityAttributes.ContentState.duringJourneyDelayed
 }
 

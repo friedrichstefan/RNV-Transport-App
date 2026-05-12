@@ -220,7 +220,7 @@ struct TransitMapViewRepresentable: View {
     private var mapContent: some View {
         if let scope = mapScope {
             Map(scope: scope) { mapAnnotations }
-                .mapScope(scope)
+                .mapControls { }
         } else {
             Map { mapAnnotations }
         }

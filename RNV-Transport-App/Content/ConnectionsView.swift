@@ -27,7 +27,7 @@ struct ConnectionsView: View {
     @State private var isPickingStartStation = true
     @State private var selectedTrip: DetailedTrip?
     @State private var selectedDateTime: Date = Date()
-    @State private var useCustomTime = false
+    @State private var tripTimeMode: TripTimeMode = .now
     @State private var currentSearchTime: Date = Date()
     @State private var hasSearchedOnce: Bool = false
     @State private var scrollOffset: CGFloat = 0
@@ -211,7 +211,7 @@ struct ConnectionsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(Self.greetingText)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(AppTheme.muted)
+                        .foregroundColor(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
                         .tracking(1.4)
                         .textCase(.uppercase)
                     Text("Verbindungen")
@@ -438,7 +438,7 @@ struct ConnectionsView: View {
             }
         }
 
-        return trips
+        return trips.sorted { $0.startTime < $1.startTime }
     }
 
     // MARK: - Loading View
@@ -565,24 +565,17 @@ struct ConnectionsView: View {
 
     private var searchActionsCard: some View {
         VStack(spacing: 0) {
-            // Time toggle
-            HStack {
-                Toggle(isOn: $useCustomTime) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "clock")
-                            .foregroundColor(useCustomTime ? AppTheme.primaryColor : .secondary)
-                            .font(.system(size: 13))
-                        Text("Abfahrt planen")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(useCustomTime ? .primary : .secondary)
-                    }
-                }
-                .tint(AppTheme.primaryColor)
+            // Time mode picker
+            Picker("", selection: $tripTimeMode) {
+                Text("Jetzt").tag(TripTimeMode.now)
+                Text("Abfahrt").tag(TripTimeMode.departure)
+                Text("Ankunft").tag(TripTimeMode.arrival)
             }
+            .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
 
-            if useCustomTime {
+            if tripTimeMode != .now {
                 Divider().padding(.horizontal, 16)
 
                 DatePicker(
@@ -592,7 +585,7 @@ struct ConnectionsView: View {
                 )
                 .datePickerStyle(.compact)
                 .labelsHidden()
-                .accessibilityLabel("Abfahrtszeit auswählen")
+                .accessibilityLabel(tripTimeMode == .arrival ? "Ankunftszeit auswählen" : "Abfahrtszeit auswählen")
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -631,7 +624,7 @@ struct ConnectionsView: View {
                 .shadow(color: AppTheme.shadowColor(), radius: 10, y: 4)
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppTheme.hairlineAdaptive(colorScheme), lineWidth: 1))
         )
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: useCustomTime)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: tripTimeMode != .now)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedStartStation != nil && selectedEndStation != nil)
         .padding(.horizontal)
     }
@@ -679,6 +672,7 @@ struct ConnectionsView: View {
 
     private func navigationButton(earlier: Bool) -> some View {
         Button {
+            HapticHelper.impact(.light)
             Task {
                 if earlier { await loadEarlierConnections() }
                 else { await loadLaterConnections() }
@@ -729,16 +723,19 @@ struct ConnectionsView: View {
         if !authService.isTokenValid { await authService.autoAuthenticate() }
         guard let token = authService.accessToken, !token.isEmpty else { return }
 
-        let departureTime = useCustomTime ? selectedDateTime : Date()
-        currentSearchTime = departureTime
+        let searchDate = tripTimeMode == .now ? Date() : selectedDateTime
+        currentSearchTime = searchDate
         hasSearchedOnce = true
+        let iso = ISO8601DateFormatter().string(from: searchDate)
 
         await graphQLService.getConnections(
             fromGlobalID: startStation.globalID,
             toGlobalID: endStation.globalID,
             accessToken: token,
-            departureTime: ISO8601DateFormatter().string(from: departureTime)
+            departureTime: tripTimeMode != .arrival ? iso : nil,
+            arrivalTime: tripTimeMode == .arrival ? iso : nil
         )
+        Task { await graphQLService.enrichConnectionsWithOccupancy(accessToken: token) }
     }
 
     private func loadEarlierConnections() async {
@@ -762,6 +759,7 @@ struct ConnectionsView: View {
             departureTime: ISO8601DateFormatter().string(from: earlierTime),
             mode: .prepend
         )
+        Task { await graphQLService.enrichConnectionsWithOccupancy(accessToken: token) }
     }
 
     private func loadLaterConnections() async {
@@ -785,7 +783,14 @@ struct ConnectionsView: View {
             departureTime: ISO8601DateFormatter().string(from: laterTime),
             mode: .append
         )
+        Task { await graphQLService.enrichConnectionsWithOccupancy(accessToken: token) }
     }
+}
+
+// MARK: - Trip Time Mode
+
+enum TripTimeMode {
+    case now, departure, arrival
 }
 
 // MARK: - Preference Key for Scroll Offset

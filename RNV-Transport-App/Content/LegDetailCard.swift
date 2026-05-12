@@ -152,6 +152,20 @@ struct TimedLegCard: View {
                 .foregroundColor(.secondary)
             }
 
+            // Auslastungs-Badge
+            let occ = leg.occupancy ?? .low
+            HStack(spacing: 1) {
+                ForEach(0..<3, id: \.self) { i in
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 8, weight: .medium))
+                        .opacity(i < occ.filledCount ? 1.0 : 0.18)
+                }
+            }
+            .foregroundColor(occ.color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(occ.color.opacity(0.1)))
+
             Spacer()
         }
         .accessibilityElement(children: .combine)

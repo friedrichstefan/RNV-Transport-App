@@ -4,12 +4,18 @@
 import Foundation
 import WatchConnectivity
 
-// Nachrichten-Keys – müssen mit WatchConnectivityManager.swift der Watch App übereinstimmen.
 private enum WatchMessageKey {
-    static let requestDepartures = "requestDepartures"
-    static let stationID         = "stationID"
-    static let stationName       = "stationName"
-    static let departures        = "departures"
+    static let requestDepartures  = "requestDepartures"
+    static let stationID          = "stationID"
+    static let stationName        = "stationName"
+    static let departures         = "departures"
+    static let requestConnections = "requestConnections"
+    static let fromID             = "fromID"
+    static let toID               = "toID"
+    static let connections        = "connections"
+    static let requestStationSearch    = "requestStationSearch"
+    static let searchQuery             = "searchQuery"
+    static let stationSearchResults    = "stationSearchResults"
 }
 
 final class PhoneConnectivityManager: NSObject {
@@ -59,13 +65,19 @@ final class PhoneConnectivityManager: NSObject {
     }
 
     /// Benachrichtigt die Watch-App, dass sich Fahrtdaten geändert haben.
+    /// Nutzt sendMessage wenn Watch erreichbar, sonst transferUserInfo als Fallback.
     func notifyTripUpdate() {
         guard WCSession.isSupported(),
               WCSession.default.activationState == .activated,
-              WCSession.default.isReachable
+              WCSession.default.isPaired,
+              WCSession.default.isWatchAppInstalled
         else { return }
 
-        WCSession.default.sendMessage(["tripDataDidChange": true], replyHandler: nil, errorHandler: nil)
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(["tripDataDidChange": true], replyHandler: nil, errorHandler: nil)
+        } else {
+            WCSession.default.transferUserInfo(["tripDataDidChange": true])
+        }
     }
 }
 
@@ -85,14 +97,47 @@ extension PhoneConnectivityManager: WCSessionDelegate {
                  didReceiveMessage message: [String: Any],
                  replyHandler: @escaping ([String: Any]) -> Void) {
 
-        guard message[WatchMessageKey.requestDepartures] != nil,
-              let stationID = message[WatchMessageKey.stationID] as? String else {
+        if message[WatchMessageKey.requestDepartures] != nil,
+           let stationID = message[WatchMessageKey.stationID] as? String {
+            Task { await fetchAndReply(stationID: stationID, replyHandler: replyHandler) }
+        } else if message[WatchMessageKey.requestConnections] != nil,
+                  let fromID = message[WatchMessageKey.fromID] as? String,
+                  let toID   = message[WatchMessageKey.toID]   as? String {
+            Task { await fetchConnectionsAndReply(fromID: fromID, toID: toID, replyHandler: replyHandler) }
+        } else if message[WatchMessageKey.requestStationSearch] != nil,
+                  let query = message[WatchMessageKey.searchQuery] as? String {
+            Task { await searchStationsAndReply(query: query, replyHandler: replyHandler) }
+        } else {
             replyHandler([:])
-            return
+        }
+    }
+
+    @MainActor
+    private func searchStationsAndReply(query: String,
+                                        replyHandler: @escaping ([String: Any]) -> Void) async {
+        guard let graphQL = graphQLService,
+              let auth = authService else {
+            replyHandler([:]); return
         }
 
-        Task {
-            await fetchAndReply(stationID: stationID, replyHandler: replyHandler)
+        let token: String
+        if let existing = auth.accessToken {
+            token = existing
+        } else {
+            await auth.authenticate()
+            guard let fresh = auth.accessToken else { replyHandler([:]); return }
+            token = fresh
+        }
+
+        await graphQL.searchStationsByName(name: query, accessToken: token)
+        let results: [WatchStationResult] = graphQL.stations.prefix(15).map {
+            WatchStationResult(id: $0.globalID, name: $0.longName)
+        }
+
+        if let data = try? JSONEncoder().encode(results) {
+            replyHandler([WatchMessageKey.stationSearchResults: data])
+        } else {
+            replyHandler([:])
         }
     }
 
@@ -135,9 +180,35 @@ extension PhoneConnectivityManager: WCSessionDelegate {
             replyHandler([:])
         }
     }
+
+    @MainActor
+    private func fetchConnectionsAndReply(fromID: String, toID: String,
+                                          replyHandler: @escaping ([String: Any]) -> Void) async {
+        guard let graphQL = graphQLService,
+              let auth = authService else {
+            replyHandler([:])
+            return
+        }
+
+        let token: String
+        if let existing = auth.accessToken {
+            token = existing
+        } else {
+            await auth.authenticate()
+            guard let fresh = auth.accessToken else { replyHandler([:]); return }
+            token = fresh
+        }
+
+        let trips = await graphQL.fetchConnectionsForWatch(fromGlobalID: fromID, toGlobalID: toID, accessToken: token)
+        if let data = try? JSONEncoder().encode(trips) {
+            replyHandler([WatchMessageKey.connections: data])
+        } else {
+            replyHandler([:])
+        }
+    }
 }
 
-// MARK: - Codable Response-Modell (spiegelt WatchDeparture in der Watch App)
+// MARK: - Codable Response-Modelle (spiegeln Watch-Typen)
 
 private struct WatchDepartureResponse: Codable {
     let id: String
@@ -147,5 +218,10 @@ private struct WatchDepartureResponse: Codable {
     let estimatedTime: String?
     let serviceType: String?
     let delayMinutes: Int?
+}
+
+private struct WatchStationResult: Codable {
+    let id: String
+    let name: String
 }
 

@@ -19,11 +19,12 @@ struct DepartureBoardView: View {
     @State private var isLoadingDepartures = false
     @State private var departureError: String?
     @State private var showStationPicker = false
-    @State private var refreshTimer: Timer?
+    @State private var refreshTask: Task<Void, Never>?
     @State private var lastRefresh: Date?
     @State private var loadEpoch: Int = 0
     @State private var selectedDeparture: Departure?
     @State private var departureDate: Date = Date()
+    @State private var departureDisplayLimit: Int = 10
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
@@ -100,11 +101,16 @@ struct DepartureBoardView: View {
                 )
             }
             .sheet(item: $selectedDeparture) { dep in
-                DepartureTripDetailView(departure: dep)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+                DepartureTripDetailView(
+                    departure: dep,
+                    graphQLService: service,
+                    authService: authService
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
             .onChange(of: selectedStation) {
+                departureDisplayLimit = 10
                 Task { await loadDepartures() }
             }
             .onChange(of: departureDate) {
@@ -115,7 +121,7 @@ struct DepartureBoardView: View {
                 startAutoRefresh()
             }
             .onDisappear {
-                refreshTimer?.invalidate()
+                refreshTask?.cancel()
             }
         }
     }
@@ -194,9 +200,9 @@ struct DepartureBoardView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 9)
-        .background(AppTheme.surfaceStrong)
+        .background(AppTheme.surfaceStrongAdaptive(colorScheme))
         .overlay(
-            AppTheme.hairline.frame(height: 1),
+            AppTheme.hairlineAdaptive(colorScheme).frame(height: 1),
             alignment: .bottom
         )
         .accessibilityElement(children: .combine)
@@ -206,8 +212,11 @@ struct DepartureBoardView: View {
     // MARK: - Departure List
 
     private var departureList: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(departures.enumerated()), id: \.element.id) { index, dep in
+        let visible = Array(departures.prefix(departureDisplayLimit))
+        let hasMore = departures.count > departureDisplayLimit
+
+        return VStack(spacing: 0) {
+            ForEach(Array(visible.enumerated()), id: \.element.id) { index, dep in
                 Button {
                     HapticHelper.selection()
                     selectedDeparture = dep
@@ -215,11 +224,35 @@ struct DepartureBoardView: View {
                     DepartureRowView(departure: dep)
                 }
                 .buttonStyle(.plain)
-                if index < departures.count - 1 {
-                    AppTheme.hairline
+                if index < visible.count - 1 {
+                    AppTheme.hairlineAdaptive(colorScheme)
                         .frame(height: 1)
                         .padding(.leading, 20)
                 }
+            }
+
+            if hasMore {
+                AppTheme.hairlineAdaptive(colorScheme)
+                    .frame(height: 1)
+
+                Button {
+                    HapticHelper.impact(.light)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        departureDisplayLimit += 10
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("\(departures.count - departureDisplayLimit) weitere Abfahrten")
+                            .font(.subheadline.weight(.medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(AppTheme.mutedAdaptive(colorScheme, contrast: colorSchemeContrast))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(departures.count - departureDisplayLimit) weitere Abfahrten anzeigen")
             }
         }
         .padding(.bottom, 48)
@@ -273,7 +306,7 @@ struct DepartureBoardView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(AppTheme.surfaceDark)
+                    .background(AppTheme.primary)
                     .clipShape(Capsule())
             }
 
@@ -375,10 +408,15 @@ struct DepartureBoardView: View {
         isLoadingDepartures = true
         departureError = nil
         let time = ISO8601DateFormatter().string(from: departureDate)
-        let result = await service.getDepartures(globalID: station.globalID, accessToken: token, time: time)
+        let result = await service.getDepartures(station: station, accessToken: token, time: time)
 
         guard loadEpoch == myEpoch else { return }
-        departures = result.departures
+        departures = result.departures.map { dep in
+            guard dep.boardStopName == nil else { return dep }
+            var d = dep
+            d.boardStopName = station.longName
+            return d
+        }
         departureError = departures.isEmpty ? result.error : nil
         lastRefresh = Date()
         isLoadingDepartures = false
@@ -389,9 +427,13 @@ struct DepartureBoardView: View {
     }
 
     private func startAutoRefresh() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-            guard !self.isLoadingDepartures else { return }
-            Task { await self.loadDepartures() }
+        refreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                guard !Task.isCancelled else { break }
+                guard !isLoadingDepartures else { continue }
+                await loadDepartures()
+            }
         }
     }
 }
@@ -411,7 +453,7 @@ struct DepartureRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(departure.direction)
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(AppTheme.ink)
+                    .foregroundColor(AppTheme.inkAdaptive(colorScheme))
                     .lineLimit(1)
                 Text(departure.serviceTypeDisplay)
                     .font(.caption2.weight(.medium))
@@ -420,6 +462,8 @@ struct DepartureRowView: View {
             }
 
             Spacer()
+
+            occupancyBadge(departure.occupancy ?? .low)
 
             VStack(alignment: .trailing, spacing: 2) {
                 Text(formatter.formatTime(departure.scheduledDeparture))
@@ -440,8 +484,22 @@ struct DepartureRowView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(departure.lineName) Richtung \(departure.direction), \(formatter.formatTime(departure.scheduledDeparture))\(departure.delayMinutes.map { $0 > 0 ? ", +\($0) Minuten" : ", pünktlich" } ?? "")")
+        .accessibilityLabel("\(departure.lineName) Richtung \(departure.direction), \(formatter.formatTime(departure.scheduledDeparture))\(departure.delayMinutes.map { $0 > 0 ? ", +\($0) Minuten" : ", pünktlich" } ?? "")\(departure.occupancy.map { $0 != .unknown ? ", Auslastung \($0.displayText)" : "" } ?? "")")
         .accessibilityHint("Tippen für Details")
+    }
+
+    private func occupancyBadge(_ level: OccupancyLevel) -> some View {
+        HStack(spacing: 1) {
+            ForEach(0..<3, id: \.self) { i in
+                Image(systemName: "person.fill")
+                    .font(.system(size: 9, weight: .medium))
+                    .opacity(i < level.filledCount ? 1.0 : 0.18)
+            }
+        }
+        .foregroundColor(level.color)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(level.color.opacity(0.1)))
     }
 
     private var lineBadge: some View {
@@ -487,6 +545,8 @@ struct Departure: Identifiable {
     var boardStopName: String? = nil
     var intermediateStops: [DepartureStop] = []
     var finalStop: DepartureStop? = nil
+    var originGlobalID: String = ""
+    var occupancy: OccupancyLevel? = nil
 
     var delayMinutes: Int? {
         let fmt = DateFormattingHelper.shared
@@ -522,10 +582,16 @@ struct Departure: Identifiable {
 
 struct DepartureTripDetailView: View {
     let departure: Departure
+    let graphQLService: GraphQLService
+    let authService: AuthService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     private let formatter = DateFormattingHelper.shared
+
+    @State private var fullIntermediates: [DepartureStop]?
+    @State private var fullFinalStop: DepartureStop?
+    @State private var isLoadingFullRoute = false
 
     @ScaledMetric(relativeTo: .title) private var departureTimeSize: CGFloat = 28
     @ScaledMetric(relativeTo: .title2) private var countdownSize: CGFloat = 28
@@ -554,14 +620,43 @@ struct DepartureTripDetailView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Fertig") { dismiss() }
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(AppTheme.ink)
+                        .foregroundStyle(AppTheme.inkAdaptive(colorScheme))
                 }
+            }
+            .task {
+                await loadFullRoute()
             }
         }
     }
 
+    private func loadFullRoute() async {
+        guard !departure.originGlobalID.isEmpty,
+              let token = authService.accessToken else { return }
+        isLoadingFullRoute = true
+        let result = await graphQLService.fetchFullDepartureRoute(
+            originID: departure.originGlobalID,
+            direction: departure.direction,
+            lineName: departure.lineName,
+            scheduledDeparture: departure.scheduledDeparture,
+            accessToken: token
+        )
+        if !result.intermediates.isEmpty || result.finalStop != nil {
+            fullIntermediates = result.intermediates
+            fullFinalStop = result.finalStop
+        }
+        isLoadingFullRoute = false
+    }
+
     private var hasStopData: Bool {
         departure.boardStopName != nil || !departure.intermediateStops.isEmpty || departure.finalStop != nil
+    }
+
+    private var effectiveIntermediates: [DepartureStop] {
+        fullIntermediates ?? departure.intermediateStops
+    }
+
+    private var effectiveFinalStop: DepartureStop? {
+        fullFinalStop ?? departure.finalStop
     }
 
     // MARK: Header
@@ -690,14 +785,21 @@ struct DepartureTripDetailView: View {
 
     private var stopTimelineSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Streckenverlauf")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(AppTheme.muted)
-                .tracking(0.5)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
+            HStack {
+                Text("Streckenverlauf")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AppTheme.muted)
+                    .tracking(0.5)
+                    .accessibilityAddTraits(.isHeader)
+                if isLoadingFullRoute {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .padding(.leading, 4)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
 
             let allStops = buildStopList()
             ForEach(Array(allStops.enumerated()), id: \.offset) { index, stop in
@@ -712,7 +814,7 @@ struct DepartureTripDetailView: View {
                 )
             }
 
-            if let finalStopName = departure.finalStop?.name,
+            if let finalStopName = effectiveFinalStop?.name,
                finalStopName != departure.direction {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.forward")
@@ -746,7 +848,7 @@ struct DepartureTripDetailView: View {
                 isFinal: false
             ))
         }
-        for s in departure.intermediateStops {
+        for s in effectiveIntermediates {
             stops.append(StopItem(
                 name: s.name,
                 time: s.formattedTime,
@@ -754,7 +856,7 @@ struct DepartureTripDetailView: View {
                 isFinal: false
             ))
         }
-        if let final_ = departure.finalStop {
+        if let final_ = effectiveFinalStop {
             stops.append(StopItem(
                 name: final_.name,
                 time: final_.formattedTime,

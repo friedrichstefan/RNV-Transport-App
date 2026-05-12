@@ -43,11 +43,11 @@ struct PrivacyPolicyView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(section.title)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(AppTheme.ink)
+                .foregroundColor(AppTheme.inkAdaptive(colorScheme))
 
             Text(section.body)
                 .font(.system(size: 14))
-                .foregroundColor(AppTheme.bodyText)
+                .foregroundColor(AppTheme.bodyTextAdaptive(colorScheme))
                 .lineSpacing(4)
         }
         .padding(16)

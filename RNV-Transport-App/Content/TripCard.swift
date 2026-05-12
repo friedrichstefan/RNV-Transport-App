@@ -47,6 +47,11 @@ struct TripCard: View {
         trip.legs.filter { $0.isTimedLeg }
     }
 
+    private var worstOccupancy: OccupancyLevel {
+        let levels = timedLegs.compactMap { $0.occupancy }.filter { $0 != .unknown }
+        return levels.max(by: { $0.fillPercentage < $1.fillPercentage }) ?? .unknown
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             Rectangle()
@@ -157,6 +162,16 @@ struct TripCard: View {
                 )
             } else if !isPast {
                 statusBadge(text: "Pünktlich", icon: "checkmark.circle.fill", color: .green, bg: Color.green.opacity(0.12))
+            }
+
+            let occ = worstOccupancy
+            if occ != .unknown {
+                statusBadge(
+                    text: occ.shortText,
+                    icon: occ.iconName,
+                    color: occ.color,
+                    bg: occ.color.opacity(0.12)
+                )
             }
         }
     }

@@ -20,9 +20,12 @@ struct RNVWatchApp: App {
                     }
                 }
         }
-        .onChange(of: scenePhase) { phase in
+        .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 dataManager.refresh()
+                dataManager.startAutoRefresh()
+            } else if phase == .background || phase == .inactive {
+                dataManager.stopAutoRefresh()
             }
         }
     }

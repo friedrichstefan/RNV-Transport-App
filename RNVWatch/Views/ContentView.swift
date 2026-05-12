@@ -17,6 +17,10 @@ struct ContentView: View {
             DeparturesView()
                 .tag(2)
                 .tabItem { Label("Abfahrten", systemImage: "clock") }
+
+            ConnectionSearchView()
+                .tag(3)
+                .tabItem { Label("Suche", systemImage: "magnifyingglass") }
         }
     }
 }

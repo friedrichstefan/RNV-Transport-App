@@ -22,6 +22,10 @@ struct TripLiveActivityAttributes: ActivityAttributes {
         var lineName: String
         var serviceType: String
         var phase: TripPhase
+        /// Name der Umstiegsstation (nil wenn aktuelles Leg das letzte ist)
+        var nextTransferStopName: String? = nil
+        /// Geschätzte Ankunftszeit an der Umstiegsstation als ISO-String
+        var nextTransferArrivalISO: String? = nil
     }
 
     var tripId: String

@@ -572,6 +572,44 @@ struct ContentMediumView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
 
+            // Umstieg-Badge (nur wenn weiterer Leg folgt)
+            if let transferStop = context.state.nextTransferStopName,
+               let transferISO = context.state.nextTransferArrivalISO {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.orange)
+                    Text("Umstieg")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.orange.opacity(0.85))
+                    Text(transferStop)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    if let range = countdownRange(to: transferISO) {
+                        HStack(spacing: 2) {
+                            Text("in")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Text(timerInterval: range, countsDown: true)
+                                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(.orange)
+                                .contentTransition(.numericText(countsDown: true))
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.orange.opacity(0.08))
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+            }
+
             // Progress bar
             JourneyProgressBar(
                 departureDate: DateCalculationHelper.parseDate(context.attributes.departureTimeISO) ?? Date(),
@@ -839,6 +877,8 @@ struct DynamicIslandExpandedBottom: View {
     let delay: Int?
     let phase: TripPhase
     let tripId: String
+    let nextTransferStopName: String?
+    let nextTransferArrivalISO: String?
     let currentTime: Date
 
     /// Lokal berechnete Phase für sofortigen Übergang
@@ -1014,6 +1054,29 @@ struct DynamicIslandExpandedBottom: View {
             }
             .padding(.horizontal, 12)
 
+            // Umstieg-Indicator (nur wenn weiterer Leg folgt)
+            if let transferStop = nextTransferStopName,
+               let transferISO = nextTransferArrivalISO {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.orange)
+                    Text(transferStop)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                    if let range = transferRange(to: transferISO) {
+                        Text(timerInterval: range, countsDown: true)
+                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(.orange)
+                            .contentTransition(.numericText(countsDown: true))
+                    }
+                }
+                .padding(.horizontal, 12)
+            }
+
             // Progress bar
             JourneyProgressBar(
                 departureDate: DateCalculationHelper.parseDate(departureTimeISO) ?? Date(),
@@ -1028,6 +1091,12 @@ struct DynamicIslandExpandedBottom: View {
             .padding(.bottom, 4)
         }
         .padding(.top, 2)
+    }
+
+    private func transferRange(to isoString: String) -> ClosedRange<Date>? {
+        guard let date = DateCalculationHelper.parseDate(isoString),
+              date > currentTime else { return nil }
+        return currentTime...date
     }
 
     private func departureRange() -> ClosedRange<Date>? {
@@ -1280,6 +1349,19 @@ extension TripLiveActivityAttributes.ContentState {
             currentLegIndex: 1, nextStopName: "Heidelberg Hbf", nextStopTime: "14:48",
             estimatedTime: nil, delay: nil, destination: "Heidelberg Bismarckplatz",
             lineName: "Linie 5", serviceType: "STRASSENBAHN", phase: .duringJourney
+        )
+    }
+
+    static var duringJourneyWithTransfer: TripLiveActivityAttributes.ContentState {
+        let transferDate = Date().addingTimeInterval(8 * 60)
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return TripLiveActivityAttributes.ContentState(
+            currentLegIndex: 0, nextStopName: "Heidelberg Hbf", nextStopTime: "14:48",
+            estimatedTime: nil, delay: nil, destination: "Heidelberg Bismarckplatz",
+            lineName: "Linie 5", serviceType: "STRASSENBAHN", phase: .duringJourney,
+            nextTransferStopName: "Heidelberg Hbf",
+            nextTransferArrivalISO: fmt.string(from: transferDate)
         )
     }
 

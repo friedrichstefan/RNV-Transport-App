@@ -1,42 +1,24 @@
 import SwiftUI
 
-// Vordefinierte Haltestellen im RNV-Bereich für schnellen Zugriff
-private struct QuickStation: Identifiable, Hashable {
-    let id: String  // globalID
-    let name: String
-}
-
-private let quickStations: [QuickStation] = [
-    QuickStation(id: "de:08222:115", name: "MA Hauptbahnhof"),
-    QuickStation(id: "de:08222:101", name: "MA Paradeplatz"),
-    QuickStation(id: "de:08221:1",   name: "HD Hauptbahnhof"),
-    QuickStation(id: "de:07311:100", name: "LU Hauptbahnhof"),
-    QuickStation(id: "de:08222:110", name: "MA Wasserturm"),
-    QuickStation(id: "de:08221:15",  name: "HD Bismarckplatz"),
-]
-
 struct DeparturesView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
-    @State private var selectedStationID = quickStations[0].id
-
-    private var selectedStation: QuickStation {
-        quickStations.first { $0.id == selectedStationID } ?? quickStations[0]
-    }
+    @State private var selectedStationID   = WatchStation.all[0].id
+    @State private var selectedStationName = WatchStation.all[0].name
 
     var body: some View {
         NavigationStack {
             List {
-                // Haltestellenauswahl als Picker (watchOS-nativ)
                 Section {
-                    Picker("Haltestelle", selection: $selectedStationID) {
-                        ForEach(quickStations) { station in
-                            Text(station.name).tag(station.id)
-                        }
+                    NavigationLink(destination: WatchStationPickerView(
+                        title: "Haltestelle",
+                        stationID: $selectedStationID,
+                        stationName: $selectedStationName
+                    )) {
+                        Label(selectedStationName, systemImage: "tram.fill")
+                            .font(.caption)
                     }
-                    .onChange(of: selectedStationID) { _ in loadDepartures() }
                 }
 
-                // Inhaltsbereich
                 if connectivity.isLoading {
                     HStack {
                         Spacer()
@@ -59,13 +41,18 @@ struct DeparturesView: View {
             }
             .navigationTitle("Abfahrten")
             .onAppear { loadDepartures() }
+            .onChange(of: selectedStationID) { loadDepartures() }
+            .onChange(of: connectivity.isReachable) { _, isReachable in
+                guard isReachable, connectivity.departures.isEmpty, !connectivity.isLoading else { return }
+                loadDepartures()
+            }
         }
     }
 
     private func loadDepartures() {
         connectivity.requestDepartures(
-            stationID: selectedStation.id,
-            stationName: selectedStation.name
+            stationID: selectedStationID,
+            stationName: selectedStationName
         )
     }
 }

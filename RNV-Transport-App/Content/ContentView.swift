@@ -15,12 +15,21 @@ struct ContentView: View {
 
     @State private var activeTripCount = 0
     @State private var selectedTab = 0
+    @Environment(\.colorScheme) private var colorScheme
 
     init() {
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithOpaqueBackground()
-        tabBarAppearance.backgroundColor = UIColor(Color(hex: "#f5f5f5"))
-        tabBarAppearance.shadowColor = UIColor(Color(hex: "#e7e5e4"))
+        tabBarAppearance.backgroundColor = UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 0.11, green: 0.10, blue: 0.09, alpha: 1) // #1c1917
+                : UIColor(red: 0.961, green: 0.961, blue: 0.961, alpha: 1) // #f5f5f5
+        }
+        tabBarAppearance.shadowColor = UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 0.267, green: 0.251, blue: 0.235, alpha: 1) // #44403c
+                : UIColor(red: 0.906, green: 0.898, blue: 0.878, alpha: 1) // #e7e5e4
+        }
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
     }
@@ -63,7 +72,7 @@ struct ContentView: View {
                 }
                 .tag(3)
         }
-        .tint(AppTheme.primaryColor)
+        .tint(colorScheme == .dark ? .white : AppTheme.primaryColor)
         .dynamicTypeSize(.xSmall ... .accessibility2)
         .onAppear {
             #if DEBUG
@@ -149,6 +158,9 @@ struct AppTheme {
             return s == .dark ? Color(hex: "#c8c2bc") : Color(hex: "#565049")
         }
         return s == .dark ? Color(hex: "#a8a29e") : muted
+    }
+    static func bodyTextAdaptive(_ s: ColorScheme) -> Color {
+        s == .dark ? Color(hex: "#c8c2bc") : bodyText
     }
 }
 

@@ -20,9 +20,11 @@ class LiveActivityManager: ObservableObject {
     @Published var lastError: String?
     
     // MARK: - Private Properties
-    
+
     private var updateTimers: [String: Timer] = [:]
     private var activeTrips: [String: DetailedTrip] = [:]
+    /// Trips die als live markiert sind, aber gerade keine Live Activity zeigen (warten auf ihre Reihe)
+    private var pendingTrips: [String: DetailedTrip] = [:]
     private var graphQLService: GraphQLService?
     private var accessToken: String = ""
     private let formatter = DateFormattingHelper.shared
@@ -147,7 +149,9 @@ class LiveActivityManager: ObservableObject {
                     destination: currentState.destination,
                     lineName: currentState.lineName,
                     serviceType: currentState.serviceType,
-                    phase: newPhase
+                    phase: newPhase,
+                    nextTransferStopName: currentState.nextTransferStopName,
+                    nextTransferArrivalISO: currentState.nextTransferArrivalISO
                 )
 
                 let staleDate = calculateNextStaleDate(
@@ -182,15 +186,66 @@ class LiveActivityManager: ObservableObject {
     }
     
     // MARK: - Live Activity starten
-    
+
     func startActivity(for trip: DetailedTrip, accessToken: String) async {
-        #if DEBUG
-        print("🔍 [DEBUG] startActivity aufgerufen für Trip: \(trip.id)")
-        #endif
         self.accessToken = accessToken
-        
-        await endAllActivities()
-        
+        pendingTrips[trip.id.uuidString] = trip
+        await reEvaluateNearestActivity()
+    }
+
+    // MARK: - Nächste anstehende Activity evaluieren
+
+    /// Stellt sicher, dass immer nur der zeitlich nächste Trip eine Live Activity zeigt.
+    /// Alle anderen markierten Trips bleiben in der Pending-Queue und werden aktiviert sobald der
+    /// aktuelle Trip beendet wird.
+    private func reEvaluateNearestActivity() async {
+        // Alle Kandidaten: pending + bereits aktive (falls vorhanden)
+        var candidates: [String: DetailedTrip] = pendingTrips
+        for (id, trip) in activeTrips { candidates[id] = trip }
+
+        // Abgelaufene Trips herausfiltern (5 Minuten Kulanz nach Ankunft)
+        let now = Date()
+        let valid = candidates.filter { _, trip in
+            guard let end = formatter.parseISO8601(trip.endTime) else { return true }
+            return end > now.addingTimeInterval(-300)
+        }
+
+        guard !valid.isEmpty else { return }
+
+        // Trip mit der nächstliegenden Abfahrt bestimmen
+        guard let (nearestId, nearestTrip) = valid.min(by: { a, b in
+            let dA = formatter.parseISO8601(a.value.startTime) ?? .distantFuture
+            let dB = formatter.parseISO8601(b.value.startTime) ?? .distantFuture
+            return dA < dB
+        }) else { return }
+
+        // Bereits die richtige Live Activity aktiv → nichts zu tun
+        if activeActivities[nearestId] != nil { return }
+
+        // Aktive Live Activities beenden und deren Trips in Pending zurücklegen
+        for tripId in Array(activeActivities.keys) {
+            if let trip = activeTrips[tripId] { pendingTrips[tripId] = trip }
+            updateTimers[tripId]?.invalidate()
+            updateTimers.removeValue(forKey: tripId)
+            if let activity = activeActivities[tripId] {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            activeActivities.removeValue(forKey: tripId)
+            activeTrips.removeValue(forKey: tripId)
+        }
+
+        // Nächsten Trip aus Pending nehmen und seine Live Activity starten
+        pendingTrips.removeValue(forKey: nearestId)
+        await _doStartActivity(for: nearestTrip)
+    }
+
+    // MARK: - Live Activity tatsächlich erstellen (intern)
+
+    private func _doStartActivity(for trip: DetailedTrip) async {
+        #if DEBUG
+        print("🔍 [DEBUG] _doStartActivity für Trip: \(trip.id)")
+        #endif
+
         let authInfo = ActivityAuthorizationInfo()
         #if DEBUG
         print("🔍 [DEBUG] Activity Authorization Status: \(authInfo.areActivitiesEnabled)")
@@ -263,7 +318,13 @@ class LiveActivityManager: ObservableObject {
             timetabled: firstLegDepartureTime,
             estimated: firstTimedLeg.estimatedDepartureTime
         )
-        
+
+        let allTimedLegs = trip.legs.filter { $0.isTimedLeg }
+        let initialTransferStopName: String? = allTimedLegs.count > 1 ? firstTimedLeg.alightStopName : nil
+        let initialTransferArrivalISO: String? = allTimedLegs.count > 1
+            ? (firstTimedLeg.estimatedArrivalTime ?? firstTimedLeg.arrivalTime)
+            : nil
+
         let initialState = TripLiveActivityAttributes.ContentState(
             currentLegIndex: 0,
             nextStopName: boardStop,
@@ -273,7 +334,9 @@ class LiveActivityManager: ObservableObject {
             destination: destination,
             lineName: serviceName,
             serviceType: serviceType,
-            phase: .beforeDeparture
+            phase: .beforeDeparture,
+            nextTransferStopName: initialTransferStopName,
+            nextTransferArrivalISO: initialTransferArrivalISO
         )
 
         let now = Date()
@@ -399,6 +462,10 @@ class LiveActivityManager: ObservableObject {
         guard activityState != .dismissed && activityState != .ended else {
             updateTimers[trip.id.uuidString]?.invalidate()
             updateTimers.removeValue(forKey: trip.id.uuidString)
+            activeActivities.removeValue(forKey: trip.id.uuidString)
+            activeTrips.removeValue(forKey: trip.id.uuidString)
+            // Nächsten anstehenden Trip aktivieren
+            await reEvaluateNearestActivity()
             return
         }
         
@@ -435,12 +502,23 @@ class LiveActivityManager: ObservableObject {
             leg.boardStopName == currentLeg.boardStopName &&
             leg.departureTime == currentLeg.departureTime
         }) ?? 0
-        
+
         let delay = formatter.calculateDelay(
             timetabled: departureTime,
             estimated: currentLeg.estimatedDepartureTime
         )
-        
+
+        // Nächsten Umstieg bestimmen
+        let timedLegs = trip.legs.filter { $0.isTimedLeg }
+        let currentTimedIdx = timedLegs.firstIndex(where: {
+            $0.boardStopName == currentLeg.boardStopName && $0.departureTime == currentLeg.departureTime
+        }) ?? 0
+        let hasNextLeg = currentTimedIdx < timedLegs.count - 1
+        let nextTransferStopName: String? = hasNextLeg ? currentLeg.alightStopName : nil
+        let nextTransferArrivalISO: String? = hasNextLeg
+            ? (currentLeg.estimatedArrivalTime ?? currentLeg.arrivalTime)
+            : nil
+
         let newState = TripLiveActivityAttributes.ContentState(
             currentLegIndex: currentLegIndex,
             nextStopName: boardStop,
@@ -450,7 +528,9 @@ class LiveActivityManager: ObservableObject {
             destination: destination,
             lineName: serviceName,
             serviceType: serviceType,
-            phase: currentPhase
+            phase: currentPhase,
+            nextTransferStopName: nextTransferStopName,
+            nextTransferArrivalISO: nextTransferArrivalISO
         )
 
         // staleDate = Zeitpunkt des nächsten Phasenwechsels
@@ -546,29 +626,31 @@ class LiveActivityManager: ObservableObject {
         #if DEBUG
         print("🛑 [DEBUG] endActivity für Trip: \(String(tripId.prefix(8)))")
         #endif
-        
+
+        // Aus Pending-Queue entfernen (falls dort)
+        pendingTrips.removeValue(forKey: tripId)
+
         updateTimers[tripId]?.invalidate()
         updateTimers.removeValue(forKey: tripId)
         activeTrips.removeValue(forKey: tripId)
-        
-        guard let activity = activeActivities[tripId] else {
+
+        if let activity = activeActivities[tripId] {
+            await activity.end(nil, dismissalPolicy: .immediate)
+            activeActivities.removeValue(forKey: tripId)
+            Self.activityState.removeTripDataForWidget(tripId: tripId)
+            #if DEBUG
+            print("✅ [SUCCESS] Live Activity beendet")
+            #endif
+        } else {
             #if DEBUG
             print("⚠️ [WARNING] Keine aktive Live Activity zum Beenden gefunden")
             #endif
-            return
         }
-        
-        await activity.end(nil, dismissalPolicy: .immediate)
-        
-        self.activeActivities.removeValue(forKey: tripId)
+
         self.lastError = nil
 
-        // Widget-Daten für diesen Trip entfernen
-        Self.activityState.removeTripDataForWidget(tripId: tripId)
-        
-        #if DEBUG
-        print("✅ [SUCCESS] Live Activity beendet")
-        #endif
+        // Nächsten anstehenden Trip aktivieren falls vorhanden
+        await reEvaluateNearestActivity()
     }
     
     // MARK: - Alle Activities beenden
@@ -612,6 +694,7 @@ class LiveActivityManager: ObservableObject {
         
         self.activeActivities.removeAll()
         self.activeTrips.removeAll()
+        self.pendingTrips.removeAll()
 
         // Alle Widget-Daten entfernen
         Self.activityState.removeAllTripDataForWidget()
