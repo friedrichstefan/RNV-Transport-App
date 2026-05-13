@@ -9,8 +9,8 @@ import SwiftUI
 import CoreLocation
 
 struct ContentView: View {
-    @StateObject private var authService = AuthService()
-    @StateObject private var graphQLService = GraphQLService()
+    @ObservedObject private var authService = AuthService.shared
+    @ObservedObject private var graphQLService = GraphQLService.shared
     @StateObject private var locationManager = LocationManager()
 
     @State private var activeTripCount = 0
@@ -74,16 +74,18 @@ struct ContentView: View {
         }
         .tint(colorScheme == .dark ? .white : AppTheme.primaryColor)
         .dynamicTypeSize(.xSmall ... .accessibility2)
+        .onOpenURL { url in
+            // Dynamic Island / Live Activity deep link → "Fahrten"-Tab
+            if url.scheme == "rnv", url.host == "trips" {
+                selectedTab = 2
+            }
+        }
         .onAppear {
             #if DEBUG
             print("🔍 [xcconfig] CLIENT_ID: \(Bundle.main.object(forInfoDictionaryKey: "RNV_CLIENT_ID") ?? "❌ NIL")")
             print("🔍 [xcconfig] GRAPHQL_URL: \(Bundle.main.object(forInfoDictionaryKey: "RNV_GRAPHQL_URL") ?? "❌ NIL")")
             #endif
-            // Initialen Trip-Count laden
             activeTripCount = LiveActivityState.shared.getAllActiveTrips().count
-            // Watch-Konnektivität mit Services verknüpfen
-            PhoneConnectivityManager.shared.graphQLService = graphQLService
-            PhoneConnectivityManager.shared.authService = authService
         }
         .onReceive(NotificationCenter.default.publisher(for: LiveActivityState.activeTripsDidChangeNotification)) { _ in
             activeTripCount = LiveActivityState.shared.getAllActiveTrips().count

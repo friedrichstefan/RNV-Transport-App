@@ -9,6 +9,8 @@ import Combine
 
 @MainActor
 class AuthService: ObservableObject {
+    nonisolated(unsafe) static let shared = AuthService()
+
     @Published var accessToken: String?
     @Published var isAuthenticated = false
     @Published var isAuthenticating = false

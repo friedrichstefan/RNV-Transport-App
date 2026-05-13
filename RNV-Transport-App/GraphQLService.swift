@@ -292,6 +292,8 @@ enum ConnectionLoadingMode {
 
 @MainActor
 class GraphQLService: ObservableObject {
+    static let shared = GraphQLService()
+
     @Published var stations: [Station] = []
     @Published var trips: [Trip] = []
     @Published var detailedTrips: [DetailedTrip] = []
@@ -751,6 +753,7 @@ class GraphQLService: ObservableObject {
                 return newTrips
             }
         }
+        lastError = GraphQLError(message: "Fehler beim Laden der Verbindungen")
         return []
     }
 

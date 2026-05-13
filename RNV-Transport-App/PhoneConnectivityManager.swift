@@ -21,9 +21,8 @@ private enum WatchMessageKey {
 final class PhoneConnectivityManager: NSObject {
     static let shared = PhoneConnectivityManager()
 
-    // Wird von außen gesetzt, damit wir API-Abfragen machen können
-    var graphQLService: GraphQLService?
-    var authService: AuthService?
+    private var graphQLService: GraphQLService { GraphQLService.shared }
+    private var authService: AuthService { AuthService.shared }
 
     private override init() {
         super.init()
@@ -64,14 +63,37 @@ final class PhoneConnectivityManager: NSObject {
         try? WCSession.default.updateApplicationContext(context)
     }
 
+    /// Sendet die gespeicherten Trip-Daten an die Watch via Application Context.
+    func pushTripDataToWatch() {
+        guard WCSession.isSupported(),
+              WCSession.default.activationState == .activated,
+              WCSession.default.isPaired,
+              WCSession.default.isWatchAppInstalled
+        else { return }
+
+        let defaults = UserDefaults(suiteName: "group.com.stefanfriedrich.rnvapp")
+
+        var context = WCSession.default.applicationContext
+        if let tripData = defaults?.data(forKey: "plannedTripData") {
+            context["plannedTripData"] = tripData
+        }
+        if let savedData = defaults?.data(forKey: "savedTripData") {
+            context["savedTripData"] = savedData
+        }
+
+        try? WCSession.default.updateApplicationContext(context)
+    }
+
     /// Benachrichtigt die Watch-App, dass sich Fahrtdaten geändert haben.
-    /// Nutzt sendMessage wenn Watch erreichbar, sonst transferUserInfo als Fallback.
+    /// Sendet die Daten via Application Context und zusätzlich eine Sofort-Benachrichtigung.
     func notifyTripUpdate() {
         guard WCSession.isSupported(),
               WCSession.default.activationState == .activated,
               WCSession.default.isPaired,
               WCSession.default.isWatchAppInstalled
         else { return }
+
+        pushTripDataToWatch()
 
         if WCSession.default.isReachable {
             WCSession.default.sendMessage(["tripDataDidChange": true], replyHandler: nil, errorHandler: nil)
@@ -107,6 +129,16 @@ extension PhoneConnectivityManager: WCSessionDelegate {
         } else if message[WatchMessageKey.requestStationSearch] != nil,
                   let query = message[WatchMessageKey.searchQuery] as? String {
             Task { await searchStationsAndReply(query: query, replyHandler: replyHandler) }
+        } else if message["requestTripData"] != nil {
+            let defaults = UserDefaults(suiteName: "group.com.stefanfriedrich.rnvapp")
+            var reply: [String: Any] = [:]
+            if let tripData = defaults?.data(forKey: "plannedTripData") {
+                reply["plannedTripData"] = tripData
+            }
+            if let savedData = defaults?.data(forKey: "savedTripData") {
+                reply["savedTripData"] = savedData
+            }
+            replyHandler(reply)
         } else {
             replyHandler([:])
         }
@@ -115,10 +147,8 @@ extension PhoneConnectivityManager: WCSessionDelegate {
     @MainActor
     private func searchStationsAndReply(query: String,
                                         replyHandler: @escaping ([String: Any]) -> Void) async {
-        guard let graphQL = graphQLService,
-              let auth = authService else {
-            replyHandler([:]); return
-        }
+        let graphQL = graphQLService
+        let auth = authService
 
         let token: String
         if let existing = auth.accessToken {
@@ -146,11 +176,8 @@ extension PhoneConnectivityManager: WCSessionDelegate {
     @MainActor
     private func fetchAndReply(stationID: String,
                                replyHandler: @escaping ([String: Any]) -> Void) async {
-        guard let graphQL = graphQLService,
-              let auth = authService else {
-            replyHandler([:])
-            return
-        }
+        let graphQL = graphQLService
+        let auth = authService
 
         let token: String
         if let existing = auth.accessToken {
@@ -184,11 +211,8 @@ extension PhoneConnectivityManager: WCSessionDelegate {
     @MainActor
     private func fetchConnectionsAndReply(fromID: String, toID: String,
                                           replyHandler: @escaping ([String: Any]) -> Void) async {
-        guard let graphQL = graphQLService,
-              let auth = authService else {
-            replyHandler([:])
-            return
-        }
+        let graphQL = graphQLService
+        let auth = authService
 
         let token: String
         if let existing = auth.accessToken {
