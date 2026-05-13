@@ -736,7 +736,6 @@ struct NearbyStationMapSheet: View {
         guard let item = resp.mapItems.first else {
             throw GeocodeError.noResultsFound
         }
-        }
         return item.placemark.coordinate
     }
 }
