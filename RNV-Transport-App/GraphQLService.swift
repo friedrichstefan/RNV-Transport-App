@@ -857,6 +857,40 @@ class GraphQLService: ObservableObject {
         return Station(hafasID: hafasID, globalID: globalID, longName: longName)
     }
 
+    /// Sucht eine Station anhand des Namens und gibt die zurück deren globalID übereinstimmt.
+    /// Wird vom Watch-Pfad genutzt um die hafasID für die Journeys-API zu ermitteln.
+    func resolveStation(globalID: String, name: String, accessToken: String) async -> Station? {
+        let safeName = sanitize(name)
+        let query = """
+        {
+          stations(first: 10, name: "\(safeName)") {
+            elements {
+              ... on Station {
+                hafasID
+                globalID
+                longName
+              }
+            }
+          }
+        }
+        """
+        guard let data = try? await executeQuery(query: query, accessToken: accessToken),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let responseData = json["data"] as? [String: Any],
+              let stationsObj = responseData["stations"] as? [String: Any],
+              let elements = stationsObj["elements"] as? [[String: Any]]
+        else { return nil }
+
+        for element in elements {
+            guard let hafasID = element["hafasID"] as? String,
+                  let gID = element["globalID"] as? String,
+                  let longName = element["longName"] as? String,
+                  gID == globalID else { continue }
+            return Station(hafasID: hafasID, globalID: gID, longName: longName)
+        }
+        return nil
+    }
+
     private func fetchFirstLegsAsDepartures(from originID: String, to destID: String, time: String, accessToken: String) async -> [Departure] {
         let query = """
         {

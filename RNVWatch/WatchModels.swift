@@ -25,7 +25,7 @@ struct WidgetTripLegData: Codable {
     let serviceType: String?
     let destinationLabel: String?
 
-    var isTimedLeg: Bool { legType == "timedLeg" }
+    var isTimedLeg: Bool { legType?.caseInsensitiveCompare("TimedLeg") == .orderedSame }
 }
 
 // MARK: - Geplante Trips (aus "plannedTripData" im App Group)
@@ -51,7 +51,7 @@ struct TripLegData: Codable {
     let destinationLabel: String?
     let intermediateStopNames: [String]?
 
-    var isTimedLeg: Bool { legType == "timedLeg" }
+    var isTimedLeg: Bool { legType?.caseInsensitiveCompare("TimedLeg") == .orderedSame }
 }
 
 // MARK: - Abfahrten (kommen via WatchConnectivity vom iPhone)
@@ -81,13 +81,13 @@ struct WatchStation: Identifiable, Hashable, Codable {
     let name: String
 
     static let all: [WatchStation] = [
-        WatchStation(id: "de:08222:115", name: "MA Hauptbahnhof"),
-        WatchStation(id: "de:08222:101", name: "MA Paradeplatz"),
-        WatchStation(id: "de:08222:110", name: "MA Wasserturm"),
-        WatchStation(id: "de:08222:117", name: "MA Hauptfriedhof"),
-        WatchStation(id: "de:08221:1",   name: "HD Hauptbahnhof"),
-        WatchStation(id: "de:08221:15",  name: "HD Bismarckplatz"),
-        WatchStation(id: "de:07311:100", name: "LU Hauptbahnhof"),
+        WatchStation(id: "de:08222:115", name: "Mannheim Hauptbahnhof"),
+        WatchStation(id: "de:08222:101", name: "Mannheim Paradeplatz"),
+        WatchStation(id: "de:08222:110", name: "Mannheim Wasserturm"),
+        WatchStation(id: "de:08222:117", name: "Mannheim Hauptfriedhof"),
+        WatchStation(id: "de:08221:1",   name: "Heidelberg Hauptbahnhof"),
+        WatchStation(id: "de:08221:15",  name: "Heidelberg Bismarckplatz"),
+        WatchStation(id: "de:07311:100", name: "Ludwigshafen Hauptbahnhof"),
     ]
 }
 

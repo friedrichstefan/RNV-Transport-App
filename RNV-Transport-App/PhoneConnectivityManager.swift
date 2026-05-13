@@ -121,7 +121,8 @@ extension PhoneConnectivityManager: WCSessionDelegate {
 
         if message[WatchMessageKey.requestDepartures] != nil,
            let stationID = message[WatchMessageKey.stationID] as? String {
-            Task { await fetchAndReply(stationID: stationID, replyHandler: replyHandler) }
+            let stationName = message[WatchMessageKey.stationName] as? String ?? ""
+            Task { await fetchAndReply(stationID: stationID, stationName: stationName, replyHandler: replyHandler) }
         } else if message[WatchMessageKey.requestConnections] != nil,
                   let fromID = message[WatchMessageKey.fromID] as? String,
                   let toID   = message[WatchMessageKey.toID]   as? String {
@@ -174,7 +175,7 @@ extension PhoneConnectivityManager: WCSessionDelegate {
     // MARK: - Abfahrten holen und zurückschicken
 
     @MainActor
-    private func fetchAndReply(stationID: String,
+    private func fetchAndReply(stationID: String, stationName: String,
                                replyHandler: @escaping ([String: Any]) -> Void) async {
         let graphQL = graphQLService
         let auth = authService
@@ -188,7 +189,16 @@ extension PhoneConnectivityManager: WCSessionDelegate {
             token = fresh
         }
 
-        let result = await graphQL.getDepartures(globalID: stationID, accessToken: token)
+        // Journeys-API nutzen wenn hafasID auflösbar (deutlich schneller als Hub-Workaround)
+        let station: Station
+        if !stationName.isEmpty,
+           let resolved = await graphQL.resolveStation(globalID: stationID, name: stationName, accessToken: token) {
+            station = resolved
+        } else {
+            station = Station(hafasID: "", globalID: stationID, longName: stationName)
+        }
+
+        let result = await graphQL.getDepartures(station: station, accessToken: token)
         let watchDepartures: [WatchDepartureResponse] = result.departures.map { dep in
             WatchDepartureResponse(
                 id: dep.id.uuidString,
