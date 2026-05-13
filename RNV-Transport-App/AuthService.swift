@@ -11,6 +11,8 @@ import Combine
 class AuthService: ObservableObject {
     nonisolated(unsafe) static let shared = AuthService()
 
+    nonisolated init() {}
+
     @Published var accessToken: String?
     @Published var isAuthenticated = false
     @Published var isAuthenticating = false
