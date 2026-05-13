@@ -7,6 +7,11 @@ import SwiftUI
 import MapKit
 import Combine
 
+private enum TransitMapError: LocalizedError {
+    case stopNotFound
+    var errorDescription: String? { "Haltestelle konnte nicht gefunden werden." }
+}
+
 // MARK: - ViewModel
 
 @MainActor
@@ -177,7 +182,7 @@ final class TransitMapViewModel: ObservableObject {
         req.region = Self.rnvRegion
         let resp = try await MKLocalSearch(request: req).start()
         guard let item = resp.mapItems.first else {
-            throw NSError(domain: "TransitMap", code: 0)
+            throw TransitMapError.stopNotFound
         }
         return item
     }

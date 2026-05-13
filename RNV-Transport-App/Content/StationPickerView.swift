@@ -9,6 +9,11 @@ import SwiftUI
 import CoreLocation
 import MapKit
 
+private enum GeocodeError: LocalizedError {
+    case noResultsFound
+    var errorDescription: String? { "Keine Ergebnisse für diese Haltestelle gefunden." }
+}
+
 struct StationPickerView: View {
     @ObservedObject var authService: AuthService
     @ObservedObject var graphQLService: GraphQLService
@@ -729,7 +734,8 @@ struct NearbyStationMapSheet: View {
         req.region = rnvRegion
         let resp = try await MKLocalSearch(request: req).start()
         guard let item = resp.mapItems.first else {
-            throw NSError(domain: "NearbyMap.Geocode", code: 0)
+            throw GeocodeError.noResultsFound
+        }
         }
         return item.placemark.coordinate
     }

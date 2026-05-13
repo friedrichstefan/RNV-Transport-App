@@ -36,7 +36,9 @@ struct AppConfiguration {
         if teamID == "YOUR_TEAM_ID" {
             let msg = "⚠️ teamID nicht konfiguriert - App Group wird nicht funktionieren"
             errors.append(msg)
+            #if DEBUG
             print("[AppConfiguration] WARNING: \(msg)")
+            #endif
         }
         
         return errors

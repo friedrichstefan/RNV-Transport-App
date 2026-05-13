@@ -19,7 +19,7 @@
 	<key>WKApplication</key>
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
-	<string>Stefan.Mannheim-Transportation</string>
+	<string>com.stefanfriedrich.rnvapp</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<false/>
 	<key>WKWatchOnly</key>

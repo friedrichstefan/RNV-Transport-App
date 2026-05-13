@@ -2,8 +2,8 @@ import SwiftUI
 
 struct DeparturesView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
-    @State private var selectedStationID   = WatchStation.all[0].id
-    @State private var selectedStationName = WatchStation.all[0].name
+    @State private var selectedStationID   = WatchStation.all.first?.id   ?? "de:08222:115"
+    @State private var selectedStationName = WatchStation.all.first?.name ?? "MA Hauptbahnhof"
 
     var body: some View {
         NavigationStack {

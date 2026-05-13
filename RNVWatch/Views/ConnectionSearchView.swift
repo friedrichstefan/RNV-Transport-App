@@ -2,10 +2,10 @@ import SwiftUI
 
 struct ConnectionSearchView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
-    @State private var fromID   = WatchStation.all[0].id
-    @State private var fromName = WatchStation.all[0].name
-    @State private var toID     = WatchStation.all[1].id
-    @State private var toName   = WatchStation.all[1].name
+    @State private var fromID   = WatchStation.all.first?.id                    ?? "de:08222:115"
+    @State private var fromName = WatchStation.all.first?.name                  ?? "MA Hauptbahnhof"
+    @State private var toID     = WatchStation.all.dropFirst().first?.id         ?? "de:08222:101"
+    @State private var toName   = WatchStation.all.dropFirst().first?.name       ?? "MA Paradeplatz"
 
     var body: some View {
         NavigationStack {
