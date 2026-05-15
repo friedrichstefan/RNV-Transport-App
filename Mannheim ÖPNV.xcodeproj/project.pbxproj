@@ -11,7 +11,6 @@
 		39111F902F1C61A0002FB482 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8F2F1C61A0002FB482 /* .gitignore */; };
 		395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FE92F11B3F700BC7030 /* Apollo */; };
 		395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FEB2F11B3F700BC7030 /* ApolloAPI */; };
-		BFAA0003BFAA0003BFAA0003 /* ZXingCpp in Frameworks */ = {isa = PBXBuildFile; productRef = BFAA0002BFAA0002BFAA0002 /* ZXingCpp */; };
 		395F20AA2F128DB500BC7030 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20A92F128DB500BC7030 /* WidgetKit.framework */; };
 		395F20AC2F128DB500BC7030 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20AB2F128DB500BC7030 /* SwiftUI.framework */; };
 		395F20BB2F128DB700BC7030 /* RNVLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -26,6 +25,7 @@
 		AC15135173E7EB8E1FC05134 /* WatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3586F8F82591C327AC1184D9 /* WatchApp.swift */; };
 		B59AA62002E811D8BC48653B /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2E89EE46FAF298E6247B82 /* WatchConnectivityManager.swift */; };
 		B802ECD0D273B8378428D900 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF3FF46771BC4230A08B904E /* ContentView.swift */; };
+		BFAA0003BFAA0003BFAA0003 /* ZXingCpp in Frameworks */ = {isa = PBXBuildFile; productRef = BFAA0002BFAA0002BFAA0002 /* ZXingCpp */; };
 		C3836C4CBF30DE1186B4AC83 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FEB0BED9C1BB7BD41733D19 /* WatchModels.swift */; };
 		C711471A5C4F81491F9F7149 /* SavedTripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C1D454BD4A661DC5B81DDE /* SavedTripsView.swift */; };
 		CC000003000000000000000C /* RNVWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = F50FC19EC7F5F96CA4125341 /* RNVWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -704,7 +704,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-App.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "RNV-Transport-App/RNV-Transport-AppRelease.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = A4HCRKN53K;

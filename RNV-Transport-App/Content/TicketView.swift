@@ -5,6 +5,7 @@
 
 import SwiftUI
 import PhotosUI
+import PassKit
 import Vision
 import Accelerate
 import ZXingCpp
@@ -423,6 +424,10 @@ struct TicketView: View {
     @State private var showManualSheet = false
     @State private var showFullscreen = false
     @State private var showDeleteConfirm = false
+    @State private var walletPass: PKPass? = nil
+    @State private var showWalletSheet = false
+    @State private var walletError: String? = nil
+    @State private var showWalletError = false
 
     private let scanner = TicketScanService()
     private var canvas: Color { AppTheme.canvasAdaptive(colorScheme) }
@@ -480,6 +485,17 @@ struct TicketView: View {
         .alert("Ticket entfernen?", isPresented: $showDeleteConfirm) {
             Button("Entfernen", role: .destructive) { deleteTicket() }
             Button("Abbrechen", role: .cancel) { }
+        }
+        .sheet(isPresented: $showWalletSheet) {
+            if let pass = walletPass {
+                PKAddPassView(pass: pass, isPresented: $showWalletSheet)
+                    .ignoresSafeArea()
+            }
+        }
+        .alert("Wallet-Fehler", isPresented: $showWalletError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(walletError ?? "Unbekannter Fehler")
         }
         .onAppear {
             guard ticket == nil else { return }
@@ -588,6 +604,10 @@ struct TicketView: View {
                     }
                 }
                 .padding(.horizontal, 20)
+
+                if PKAddPassesViewController.canAddPasses() {
+                    walletButton
+                }
             }
             .padding(.vertical, 16)
         }
@@ -604,6 +624,45 @@ struct TicketView: View {
                     Button("Bearbeiten", systemImage: "pencil") { showManualSheet = true }
                     Button("Entfernen", systemImage: "trash", role: .destructive) { showDeleteConfirm = true }
                 } label: { Image(systemName: "ellipsis.circle") }
+            }
+        }
+    }
+
+    // MARK: - Wallet Button
+
+    private var walletButton: some View {
+        AddToWalletButton {
+            Task { await addToWallet() }
+        }
+        .frame(height: 50)
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - Apple Wallet
+
+    private func addToWallet() async {
+        guard let ticket else { return }
+        do {
+            let generator = WalletPassGenerator()
+            let passData  = try generator.generatePass(for: ticket, barcodeImage: barcodeImage)
+            #if DEBUG
+            // Write pass to tmp for debugging (can be AirDrop'd to Mac for inspection)
+            let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("debug_ticket.pkpass")
+            try? passData.write(to: tmpURL)
+            print("💾 [WALLET] Debug-Pass geschrieben: \(tmpURL.path)")
+            #endif
+            let pass = try PKPass(data: passData)
+            await MainActor.run {
+                walletPass      = pass
+                showWalletSheet = true
+            }
+        } catch {
+            #if DEBUG
+            print("❌ [WALLET] Fehler: \(error)")
+            #endif
+            await MainActor.run {
+                walletError      = error.localizedDescription
+                showWalletError  = true
             }
         }
     }
@@ -1058,6 +1117,54 @@ private struct DTicketLogoView: View {
             .frame(width: w, height: h)
     }
 }
+
+// MARK: - PassKit UIViewControllerRepresentable
+
+private struct PKAddPassView: UIViewControllerRepresentable {
+    let pass: PKPass
+    @Binding var isPresented: Bool
+
+    func makeUIViewController(context: Context) -> PKAddPassesViewController {
+        // PKAddPassesViewController(passes:) is the modern init (iOS 6+)
+        PKAddPassesViewController(passes: [pass]) ?? UIViewController() as! PKAddPassesViewController
+    }
+
+    func updateUIViewController(_ uiViewController: PKAddPassesViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(isPresented: $isPresented) }
+
+    final class Coordinator: NSObject, PKAddPassesViewControllerDelegate {
+        @Binding var isPresented: Bool
+        init(isPresented: Binding<Bool>) { _isPresented = isPresented }
+        func addPassesViewControllerDidFinish(_ controller: PKAddPassesViewController) {
+            isPresented = false
+        }
+    }
+}
+
+// MARK: - Official "Add to Apple Wallet" Button
+
+private struct AddToWalletButton: UIViewRepresentable {
+    let action: () -> Void
+
+    func makeUIView(context: Context) -> PKAddPassButton {
+        let button = PKAddPassButton(addPassButtonStyle: .black)
+        button.addTarget(context.coordinator, action: #selector(Coordinator.tapped), for: .touchUpInside)
+        return button
+    }
+
+    func updateUIView(_ uiView: PKAddPassButton, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    final class Coordinator: NSObject {
+        let action: () -> Void
+        init(action: @escaping () -> Void) { self.action = action }
+        @objc func tapped() { action() }
+    }
+}
+
+// MARK: - Previews
 
 #Preview("Leer") {
     TicketView()
