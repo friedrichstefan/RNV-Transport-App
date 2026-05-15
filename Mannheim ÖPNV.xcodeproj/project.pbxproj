@@ -11,6 +11,7 @@
 		39111F902F1C61A0002FB482 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8F2F1C61A0002FB482 /* .gitignore */; };
 		395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FE92F11B3F700BC7030 /* Apollo */; };
 		395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FEB2F11B3F700BC7030 /* ApolloAPI */; };
+		BFAA0003BFAA0003BFAA0003 /* ZXingCpp in Frameworks */ = {isa = PBXBuildFile; productRef = BFAA0002BFAA0002BFAA0002 /* ZXingCpp */; };
 		395F20AA2F128DB500BC7030 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20A92F128DB500BC7030 /* WidgetKit.framework */; };
 		395F20AC2F128DB500BC7030 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20AB2F128DB500BC7030 /* SwiftUI.framework */; };
 		395F20BB2F128DB700BC7030 /* RNVLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -187,6 +188,7 @@
 				395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */,
 				395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */,
 				39E6B1792FACFE4900530110 /* WatchConnectivity.framework in Frameworks */,
+				BFAA0003BFAA0003BFAA0003 /* ZXingCpp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -324,6 +326,7 @@
 			packageProductDependencies = (
 				395F1FE92F11B3F700BC7030 /* Apollo */,
 				395F1FEB2F11B3F700BC7030 /* ApolloAPI */,
+				BFAA0002BFAA0002BFAA0002 /* ZXingCpp */,
 			);
 			productName = "RNV-Transport-App";
 			productReference = 395F1FD52F11B2B100BC7030 /* RNV-Transport-App.app */;
@@ -395,6 +398,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				395F1FE82F11B3F700BC7030 /* XCRemoteSwiftPackageReference "apollo-ios" */,
+				BFAA0001BFAA0001BFAA0001 /* XCRemoteSwiftPackageReference "zxing-cpp" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 395F1FD62F11B2B100BC7030 /* Products */;
@@ -897,6 +901,14 @@
 				minimumVersion = 2.0.4;
 			};
 		};
+		BFAA0001BFAA0001BFAA0001 /* XCRemoteSwiftPackageReference "zxing-cpp" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/zxing-cpp/zxing-cpp";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.2.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -909,6 +921,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 395F1FE82F11B3F700BC7030 /* XCRemoteSwiftPackageReference "apollo-ios" */;
 			productName = ApolloAPI;
+		};
+		BFAA0002BFAA0002BFAA0002 /* ZXingCpp */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BFAA0001BFAA0001BFAA0001 /* XCRemoteSwiftPackageReference "zxing-cpp" */;
+			productName = ZXingCpp;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

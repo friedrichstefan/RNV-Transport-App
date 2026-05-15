@@ -1,5 +1,5 @@
 {
-  "originHash" : "5fb607202c3e3603ac2b336f2e49c29e85856e057cd4ded5c6cab8a416ef419f",
+  "originHash" : "e5ee4627c1c0a4e85c0fc2da180933c3811615756bbf48196016198735a0c63b",
   "pins" : [
     {
       "identity" : "apollo-ios",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "68aba4be6a951a26f2f587e132ed8f82b5a63511",
         "version" : "2.0.4"
+      }
+    },
+    {
+      "identity" : "zxing-cpp",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/zxing-cpp/zxing-cpp",
+      "state" : {
+        "revision" : "d6068bcebeb8fd9f0d35a99b00d202be86a14dbe",
+        "version" : "2.3.0"
       }
     }
   ],

@@ -25,11 +25,16 @@ struct SettingsView: View {
 
     @State private var showingResetAlert = false
     @State private var showingCleanupSuccess = false
+    @State private var showingCacheSuccess = false
     @State private var showPrivacyPolicy = false
 
     private var cardBg: Color { AppTheme.surfaceCardAdaptive(colorScheme) }
     private var canvasBg: Color { AppTheme.canvasAdaptive(colorScheme) }
     private var dividerColor: Color { AppTheme.hairlineAdaptive(colorScheme) }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
+    }
 
     var body: some View {
         NavigationView {
@@ -42,9 +47,8 @@ struct SettingsView: View {
                     locationSection
                     dataSection
                     privacySection
-                    if developerMode { developerSection }
+                    developerSection
                     footerSection
-                    developerToggleRow
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -69,26 +73,18 @@ struct SettingsView: View {
             } message: {
                 Text("Alle Live Activities wurden beendet.")
             }
+            .alert("Cache geleert", isPresented: $showingCacheSuccess) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Der gespeicherte Suchverlauf wurde gelöscht.")
+            }
             .sheet(isPresented: $showPrivacyPolicy) {
                 PrivacyPolicyView()
             }
         }
     }
 
-    // MARK: - Privacy Section
-
-    private var privacySection: some View {
-        SettingsCard(title: "Datenschutz", icon: "lock.shield.fill", iconColor: .blue, cardBg: cardBg, dividerColor: dividerColor) {
-            ActionRow(
-                title: "Datenschutzerklärung",
-                icon: "doc.text.fill",
-                iconColor: .blue,
-                inkColor: AppTheme.inkAdaptive(colorScheme)
-            ) {
-                showPrivacyPolicy = true
-            }
-        }
-    }
+    // MARK: - App Header
 
     private var appHeader: some View {
         HStack(spacing: 16) {
@@ -117,7 +113,7 @@ struct SettingsView: View {
                     .foregroundColor(AppTheme.inkAdaptive(colorScheme))
 
                 HStack(spacing: 6) {
-                    Text("v1.1.0")
+                    Text("v\(appVersion)")
                         .font(.caption.weight(.medium))
                         .foregroundColor(AppTheme.onDark)
                         .padding(.horizontal, 8)
@@ -138,7 +134,7 @@ struct SettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("ÖPNV Mannheim, Version 1.1.0, Mannheim & Umgebung")
+        .accessibilityLabel("ÖPNV Mannheim, Version \(appVersion), Mannheim & Umgebung")
     }
 
     // MARK: - Search Section
@@ -178,6 +174,16 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+
+            RowDivider(color: dividerColor)
+
+            ToggleRow(
+                title: "Nur Verspätungen",
+                subtitle: "Verbindungen ohne Verspätung ausblenden",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .orange,
+                binding: $showDelaysOnly
+            )
         }
     }
 
@@ -212,6 +218,18 @@ struct SettingsView: View {
                 iconColor: .orange,
                 binding: $notificationsEnabled
             )
+            RowDivider(color: dividerColor)
+            ActionRow(
+                title: "Systemeinstellungen öffnen",
+                icon: "arrow.up.right.square",
+                iconColor: AppTheme.muted,
+                inkColor: AppTheme.inkAdaptive(colorScheme),
+                showChevron: false
+            ) {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
         }
     }
 
@@ -225,26 +243,12 @@ struct SettingsView: View {
                     Text("Aktueller Standort")
                         .font(.body)
                         .foregroundColor(AppTheme.inkAdaptive(colorScheme))
-                    if let location = locationManager.location {
-                        Text("\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundColor(AppTheme.muted)
-                            .accessibilityLabel("Koordinaten: \(String(format: "%.4f", location.latitude)) nördlich, \(String(format: "%.4f", location.longitude)) östlich")
-                        if developerMode {
-                            Text("Teststandort aktiv")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundColor(.orange)
-                        }
-                    } else {
-                        Text("Nicht verfügbar")
-                            .font(.caption)
-                            .foregroundColor(AppTheme.muted)
-                    }
+                    locationStatusText
                 }
                 Spacer()
                 if locationManager.isLocating {
                     ProgressView().scaleEffect(0.8)
-                } else {
+                } else if locationManager.authorizationStatus == .authorizedWhenInUse || locationManager.authorizationStatus == .authorizedAlways {
                     Button {
                         locationManager.startLocationUpdates()
                     } label: {
@@ -260,6 +264,50 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+
+            if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
+                RowDivider(color: dividerColor)
+                ActionRow(
+                    title: "Standortzugriff in Einstellungen erlauben",
+                    icon: "arrow.up.right.square",
+                    iconColor: AppTheme.primaryColor,
+                    inkColor: AppTheme.primaryColor,
+                    showChevron: false
+                ) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var locationStatusText: some View {
+        switch locationManager.authorizationStatus {
+        case .denied:
+            Text("Zugriff verweigert")
+                .font(.caption)
+                .foregroundColor(AppTheme.semanticError)
+        case .restricted:
+            Text("Eingeschränkt")
+                .font(.caption)
+                .foregroundColor(.orange)
+        case .authorizedWhenInUse, .authorizedAlways:
+            if let location = locationManager.location {
+                Text("\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(AppTheme.muted)
+                    .accessibilityLabel("Koordinaten: \(String(format: "%.4f", location.latitude)) nördlich, \(String(format: "%.4f", location.longitude)) östlich")
+            } else {
+                Text("Wird ermittelt …")
+                    .font(.caption)
+                    .foregroundColor(AppTheme.muted)
+            }
+        default:
+            Text("Nicht verfügbar")
+                .font(.caption)
+                .foregroundColor(AppTheme.muted)
         }
     }
 
@@ -271,18 +319,36 @@ struct SettingsView: View {
                 title: "Cache leeren",
                 icon: "arrow.clockwise",
                 iconColor: AppTheme.primaryColor,
-                inkColor: AppTheme.inkAdaptive(colorScheme)
+                inkColor: AppTheme.inkAdaptive(colorScheme),
+                showChevron: false
             ) {
-                Task { await cleanupAllActivities() }
+                clearCache()
+                showingCacheSuccess = true
             }
             RowDivider(color: dividerColor)
             ActionRow(
                 title: "Alle Live Activities beenden",
                 icon: "xmark.circle.fill",
                 iconColor: AppTheme.semanticError,
-                inkColor: AppTheme.semanticError
+                inkColor: AppTheme.semanticError,
+                showChevron: false
             ) {
                 showingResetAlert = true
+            }
+        }
+    }
+
+    // MARK: - Privacy Section
+
+    private var privacySection: some View {
+        SettingsCard(title: "Datenschutz", icon: "lock.shield.fill", iconColor: .blue, cardBg: cardBg, dividerColor: dividerColor) {
+            ActionRow(
+                title: "Datenschutzerklärung",
+                icon: "doc.text.fill",
+                iconColor: .blue,
+                inkColor: AppTheme.inkAdaptive(colorScheme)
+            ) {
+                showPrivacyPolicy = true
             }
         }
     }
@@ -290,40 +356,28 @@ struct SettingsView: View {
     // MARK: - Developer Section
 
     private var developerSection: some View {
-        SettingsCard(title: "Entwickler", icon: "hammer.fill", iconColor: .orange, cardBg: cardBg, dividerColor: dividerColor) {
-            ActionRow(title: "Mannheim Hbf (Test)", icon: "mappin.circle.fill", iconColor: .orange, inkColor: AppTheme.inkAdaptive(colorScheme)) {
-                locationManager.location = CLLocationCoordinate2D(latitude: 49.483076, longitude: 8.468409)
-            }
-            RowDivider(color: dividerColor)
-            ActionRow(title: "Heidelberg Hbf (Test)", icon: "mappin.circle.fill", iconColor: .purple, inkColor: AppTheme.inkAdaptive(colorScheme)) {
-                locationManager.location = CLLocationCoordinate2D(latitude: 49.4044, longitude: 8.6765)
-            }
-            RowDivider(color: dividerColor)
-            ActionRow(title: "Debug: State ausgeben", icon: "ant.fill", iconColor: AppTheme.semanticError, inkColor: AppTheme.inkAdaptive(colorScheme)) {
-                LiveActivityState.shared.debugPrintState()
+        SettingsCard(title: "Entwickler", icon: "hammer.fill", iconColor: developerMode ? .orange : AppTheme.muted, cardBg: cardBg, dividerColor: dividerColor) {
+            ToggleRow(
+                title: "Entwicklermodus",
+                icon: "hammer.fill",
+                iconColor: developerMode ? .orange : AppTheme.muted,
+                binding: $developerMode
+            )
+            if developerMode {
+                RowDivider(color: dividerColor)
+                ActionRow(title: "Mannheim Hbf (Test)", icon: "mappin.circle.fill", iconColor: .orange, inkColor: AppTheme.inkAdaptive(colorScheme), showChevron: false) {
+                    locationManager.location = CLLocationCoordinate2D(latitude: 49.483076, longitude: 8.468409)
+                }
+                RowDivider(color: dividerColor)
+                ActionRow(title: "Heidelberg Hbf (Test)", icon: "mappin.circle.fill", iconColor: .purple, inkColor: AppTheme.inkAdaptive(colorScheme), showChevron: false) {
+                    locationManager.location = CLLocationCoordinate2D(latitude: 49.4044, longitude: 8.6765)
+                }
+                RowDivider(color: dividerColor)
+                ActionRow(title: "Debug: State ausgeben", icon: "ant.fill", iconColor: AppTheme.semanticError, inkColor: AppTheme.inkAdaptive(colorScheme), showChevron: false) {
+                    LiveActivityState.shared.debugPrintState()
+                }
             }
         }
-    }
-
-    // MARK: - Developer Toggle
-
-    private var developerToggleRow: some View {
-        HStack(spacing: 12) {
-            IconBadge(icon: "hammer.fill", color: .gray)
-            Text("Entwicklermodus")
-                .font(.body)
-                .foregroundColor(AppTheme.inkAdaptive(colorScheme))
-            Spacer()
-            Toggle("", isOn: $developerMode)
-                .tint(.orange)
-                .labelsHidden()
-                .accessibilityLabel("Entwicklermodus")
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
     // MARK: - Footer
@@ -336,7 +390,7 @@ struct SettingsView: View {
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 10) {
-                Label("v1.1.0", systemImage: "checkmark.seal")
+                Label("v\(appVersion)", systemImage: "checkmark.seal")
                 Text("·")
                 Label("Öffentliche Daten", systemImage: "network")
                 Text("·")
@@ -351,16 +405,22 @@ struct SettingsView: View {
 
     // MARK: - Private Methods
 
-    private func cleanupAllActivities() async {
+    private func clearCache() {
         UserDefaults.standard.removeObject(forKey: "recentStations")
+        #if DEBUG
+        print("🗑️ [SETTINGS] Cache geleert")
+        #endif
+    }
+
+    private func cleanupAllActivities() async {
         if #available(iOS 16.2, *) {
             #if DEBUG
-            print("🗑️ [SETTINGS] Starte komplettes Cleanup...")
+            print("🗑️ [SETTINGS] Beende alle Live Activities...")
             #endif
             await liveActivityManager.endAllActivitiesAndResetToggles()
             LiveActivityState.shared.deactivateAllTrips()
             #if DEBUG
-            print("✅ [SETTINGS] Cleanup abgeschlossen")
+            print("✅ [SETTINGS] Live Activities beendet")
             #endif
         }
     }
@@ -439,6 +499,7 @@ private struct ActionRow: View {
     let icon: String
     let iconColor: Color
     let inkColor: Color
+    var showChevron: Bool = true
     let action: () -> Void
 
     var body: some View {
@@ -449,9 +510,11 @@ private struct ActionRow: View {
                     .font(.body)
                     .foregroundColor(inkColor)
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(AppTheme.mutedSoft)
+                if showChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(AppTheme.mutedSoft)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

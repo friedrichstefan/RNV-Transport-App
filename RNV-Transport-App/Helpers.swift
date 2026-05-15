@@ -101,6 +101,32 @@ final class DateFormattingHelper: @unchecked Sendable {
         return Self.shortDateFormatter.string(from: date)
     }
 
+    private let fullDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "dd.MM.yyyy"
+        f.locale = Locale(identifier: "de_DE")
+        return f
+    }()
+
+    func formatFullDate(_ date: Date) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return fullDateFormatter.string(from: date)
+    }
+
+    func parseGermanDate(_ raw: String) -> Date? {
+        lock.lock()
+        defer { lock.unlock() }
+        for format in ["dd.MM.yyyy", "dd/MM/yyyy"] {
+            fullDateFormatter.dateFormat = format
+            if let d = fullDateFormatter.date(from: raw) {
+                fullDateFormatter.dateFormat = "dd.MM.yyyy"
+                return d
+            }
+        }
+        return nil
+    }
+
     func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {
         let totalSeconds = max(0, Int(timeInterval))
         let minutes = totalSeconds / 60

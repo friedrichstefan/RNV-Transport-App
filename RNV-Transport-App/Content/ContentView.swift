@@ -65,12 +65,19 @@ struct ContentView: View {
                 .tag(2)
                 .badge(activeTripCount > 0 ? activeTripCount : 0)
 
+            // MARK: - Ticket Tab
+            TicketView()
+                .tabItem {
+                    Label("Ticket", systemImage: "ticket.fill")
+                }
+                .tag(3)
+
             // MARK: - Settings Tab
             SettingsView(locationManager: locationManager)
                 .tabItem {
                     Label("Einstellungen", systemImage: "gearshape.fill")
                 }
-                .tag(3)
+                .tag(4)
         }
         .tint(colorScheme == .dark ? .white : AppTheme.primaryColor)
         .dynamicTypeSize(.xSmall ... .accessibility2)
