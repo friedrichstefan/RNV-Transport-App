@@ -49,28 +49,31 @@ struct DepartureBoardView: View {
                 }
                 .allowsHitTesting(false)
 
-                ScrollView {
-                    VStack(spacing: 0) {
-                        heroHeader
+                VStack(spacing: 0) {
+                    heroHeader
+                        .background(AppTheme.canvasAdaptive(colorScheme))
 
-                        if !network.isConnected {
-                            offlineBanner
-                        }
+                    if !network.isConnected {
+                        offlineBanner
+                    }
 
-                        if isLoadingDepartures && departures.isEmpty && departureError == nil {
-                            loadingView
-                        } else if let error = departureError {
-                            errorView(error)
-                        } else if departures.isEmpty && selectedStation != nil {
-                            noDeparturesView
-                        } else if selectedStation == nil {
-                            promptView
-                        } else {
-                            departureList
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            if isLoadingDepartures && departures.isEmpty && departureError == nil {
+                                loadingView
+                            } else if let error = departureError {
+                                errorView(error)
+                            } else if departures.isEmpty && selectedStation != nil {
+                                noDeparturesView
+                            } else if selectedStation == nil {
+                                promptView
+                            } else {
+                                departureList
+                            }
                         }
                     }
+                    .refreshable { await loadDepartures() }
                 }
-                .refreshable { await loadDepartures() }
             }
             .navigationTitle("Abfahrten")
             .navigationBarTitleDisplayMode(.inline)
@@ -106,7 +109,7 @@ struct DepartureBoardView: View {
                     graphQLService: service,
                     authService: authService
                 )
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
             .onChange(of: selectedStation) {

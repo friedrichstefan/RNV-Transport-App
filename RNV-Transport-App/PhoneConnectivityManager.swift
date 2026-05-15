@@ -3,6 +3,7 @@
 
 import Foundation
 import WatchConnectivity
+import os.log
 
 private enum WatchMessageKey {
     static let requestDepartures  = "requestDepartures"
@@ -179,14 +180,21 @@ extension PhoneConnectivityManager: WCSessionDelegate {
                                replyHandler: @escaping ([String: Any]) -> Void) async {
         let graphQL = graphQLService
         let auth = authService
+        plog("fetchAndReply: stationID=\(stationID) name=\(stationName)")
 
         let token: String
         if let existing = auth.accessToken {
             token = existing
+            plog("fetchAndReply: nutze vorhandenen Token")
         } else {
+            plog("fetchAndReply: kein Token – authentifiziere…")
             await auth.authenticate()
-            guard let fresh = auth.accessToken else { replyHandler([:]); return }
+            guard let fresh = auth.accessToken else {
+                plog("fetchAndReply: Authentifizierung fehlgeschlagen")
+                replyHandler([:]); return
+            }
             token = fresh
+            plog("fetchAndReply: Token erhalten")
         }
 
         // Journeys-API nutzen wenn hafasID auflösbar (deutlich schneller als Hub-Workaround)
@@ -194,11 +202,14 @@ extension PhoneConnectivityManager: WCSessionDelegate {
         if !stationName.isEmpty,
            let resolved = await graphQL.resolveStation(globalID: stationID, name: stationName, accessToken: token) {
             station = resolved
+            plog("fetchAndReply: Station aufgelöst – hafasID=\(resolved.hafasID)")
         } else {
             station = Station(hafasID: "", globalID: stationID, longName: stationName)
+            plog("fetchAndReply: Station nicht auflösbar, nutze globalID direkt")
         }
 
         let result = await graphQL.getDepartures(station: station, accessToken: token)
+        plog("fetchAndReply: \(result.departures.count) Abfahrten von getDepartures")
         let watchDepartures: [WatchDepartureResponse] = result.departures.map { dep in
             WatchDepartureResponse(
                 id: dep.id.uuidString,
@@ -212,8 +223,10 @@ extension PhoneConnectivityManager: WCSessionDelegate {
         }
 
         if let data = try? JSONEncoder().encode(watchDepartures) {
+            plog("fetchAndReply: sende \(watchDepartures.count) Abfahrten (\(data.count) Bytes)")
             replyHandler([WatchMessageKey.departures: data])
         } else {
+            plog("fetchAndReply: JSON-Encoding fehlgeschlagen")
             replyHandler([:])
         }
     }

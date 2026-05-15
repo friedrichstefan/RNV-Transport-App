@@ -39,6 +39,8 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     @Published var stationSearchLoading = false
     @Published var stationSearchError: String? = nil
 
+    @Published var debugLog: [String] = []
+
     var onContextUpdated: (() -> Void)? = nil
 
     private override init() {
@@ -48,14 +50,59 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         WCSession.default.activate()
     }
 
+    func log(_ msg: String) {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        let entry = "\(f.string(from: Date())) \(msg)"
+        print("[WatchDebug] \(entry)")
+        debugLog.insert(entry, at: 0)
+        if debugLog.count > 80 { debugLog.removeLast() }
+    }
+
+    // MARK: - Initiale Daten vom iPhone anfordern
+
+    private var needsInitialData = true
+
+    func requestInitialData() {
+        guard WCSession.default.isReachable else {
+            needsInitialData = true
+            log("requestInitialData: iPhone nicht erreichbar – verzögert")
+            return
+        }
+        needsInitialData = false
+        log("requestInitialData: sende Anfrage ans iPhone")
+        WCSession.default.sendMessage(["requestTripData": true]) { [weak self] reply in
+            Task { @MainActor [weak self] in
+                let defaults = UserDefaults(suiteName: "group.com.stefanfriedrich.rnvapp")
+                if let tripData = reply["plannedTripData"] as? Data {
+                    defaults?.set(tripData, forKey: "plannedTripData")
+                }
+                if let savedData = reply["savedTripData"] as? Data {
+                    defaults?.set(savedData, forKey: "savedTripData")
+                }
+                self?.log("requestInitialData: Antwort erhalten (geplanteFahrten=\(reply["plannedTripData"] != nil), gespeichert=\(reply["savedTripData"] != nil))")
+                self?.onContextUpdated?()
+            }
+        } errorHandler: { [weak self] error in
+            Task { @MainActor in
+                self?.log("requestInitialData: Fehler – \(error.localizedDescription)")
+                self?.needsInitialData = true
+            }
+        }
+    }
+
     // MARK: - Abfahrten anfragen
 
     func requestDepartures(stationID: String, stationName: String) {
+        log("requestDepartures: \(stationName) (\(stationID))")
         if WCSession.default.isReachable {
+            log("→ Pfad: iPhone (WCSession erreichbar)")
             requestViaiPhone(stationID: stationID, stationName: stationName)
         } else if WatchDirectService.shared.hasCredentials {
+            log("→ Pfad: direkte API (Credentials vorhanden)")
             Task { await requestDirectly(stationID: stationID) }
         } else {
+            log("→ Pfad: keiner – iPhone nicht erreichbar, keine Credentials")
             lastError = "iPhone nicht erreichbar"
         }
     }
@@ -140,6 +187,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     private func requestViaiPhone(stationID: String, stationName: String) {
         isLoading = true
         lastError = nil
+        log("requestViaiPhone: sende WCSession-Nachricht")
 
         let msg: [String: Any] = [
             WatchMessage.requestDepartures: true,
@@ -151,6 +199,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.isLoading = false
+                self.log("requestViaiPhone: Antwort erhalten, verarbeite…")
                 self.handleDepartureReply(reply)
             }
         } errorHandler: { [weak self] error in
@@ -158,6 +207,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
                 guard let self else { return }
                 self.isLoading = false
                 self.lastError = error.localizedDescription
+                self.log("requestViaiPhone: Fehler – \(error.localizedDescription)")
             }
         }
     }
@@ -165,19 +215,34 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     private func requestDirectly(stationID: String) async {
         isLoading = true
         lastError = nil
+        log("requestDirectly: starte direkte API-Anfrage für \(stationID)")
 
         if let result = await WatchDirectService.shared.fetchDepartures(stationID: stationID) {
+            log("requestDirectly: \(result.count) Abfahrten erhalten")
             departures = result
         } else {
+            log("requestDirectly: Fehler – keine Daten zurückgekommen")
             lastError = "Keine Verbindung"
         }
         isLoading = false
     }
 
     private func handleDepartureReply(_ reply: [String: Any]) {
-        guard let rawData = reply[WatchMessage.departuresKey] as? Data else { return }
-        let decoded = (try? JSONDecoder().decode([WatchDeparture].self, from: rawData)) ?? []
-        departures = decoded
+        guard let rawData = reply[WatchMessage.departuresKey] as? Data else {
+            log("handleDepartureReply: kein 'departures'-Key in Antwort (Keys: \(reply.keys.joined(separator: ",")))")
+            return
+        }
+        log("handleDepartureReply: \(rawData.count) Bytes empfangen")
+        do {
+            let decoded = try JSONDecoder().decode([WatchDeparture].self, from: rawData)
+            log("handleDepartureReply: \(decoded.count) Abfahrten dekodiert")
+            departures = decoded
+        } catch {
+            log("handleDepartureReply: Decode-Fehler – \(error)")
+            if let jsonStr = String(data: rawData.prefix(300), encoding: .utf8) {
+                log("handleDepartureReply: JSON-Ausschnitt: \(jsonStr)")
+            }
+        }
     }
 }
 
@@ -187,14 +252,26 @@ extension WatchConnectivityManager: WCSessionDelegate {
     nonisolated func session(_ session: WCSession,
                              activationDidCompleteWith activationState: WCSessionActivationState,
                              error: Error?) {
+        let stateStr: String
+        switch activationState {
+        case .activated:   stateStr = "aktiviert"
+        case .inactive:    stateStr = "inaktiv"
+        case .notActivated: stateStr = "nicht aktiviert"
+        @unknown default:  stateStr = "unbekannt"
+        }
         Task { @MainActor in
             self.isReachable = session.isReachable
+            self.log("WCSession aktiviert: state=\(stateStr), erreichbar=\(session.isReachable)" + (error.map { ", Fehler=\($0.localizedDescription)" } ?? ""))
         }
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
             self.isReachable = session.isReachable
+            self.log("Erreichbarkeit geändert: \(session.isReachable ? "erreichbar" : "nicht erreichbar")")
+            if session.isReachable && self.needsInitialData {
+                self.requestInitialData()
+            }
         }
     }
 
@@ -202,7 +279,10 @@ extension WatchConnectivityManager: WCSessionDelegate {
     nonisolated func session(_ session: WCSession,
                              didReceiveMessage message: [String: Any]) {
         if message["tripDataDidChange"] != nil {
-            Task { @MainActor in self.onContextUpdated?() }
+            Task { @MainActor in
+                self.log("didReceiveMessage: tripDataDidChange")
+                self.onContextUpdated?()
+            }
         }
     }
 
@@ -210,16 +290,43 @@ extension WatchConnectivityManager: WCSessionDelegate {
     nonisolated func session(_ session: WCSession,
                              didReceiveUserInfo userInfo: [String: Any]) {
         if userInfo["tripDataDidChange"] != nil {
-            Task { @MainActor in self.onContextUpdated?() }
+            Task { @MainActor in
+                self.log("didReceiveUserInfo: tripDataDidChange")
+                self.onContextUpdated?()
+            }
         }
     }
 
     // Kontextaktualisierungen vom iPhone annehmen (z.B. vorberechnete Abfahrten + Credentials)
     nonisolated func session(_ session: WCSession,
                              didReceiveApplicationContext applicationContext: [String: Any]) {
+        Task { @MainActor in
+            self.log("didReceiveApplicationContext: Keys=[\(applicationContext.keys.joined(separator: ","))]")
+        }
         if let rawData = applicationContext[WatchMessage.departuresKey] as? Data,
            let decoded = try? JSONDecoder().decode([WatchDeparture].self, from: rawData) {
-            Task { @MainActor in self.departures = decoded }
+            Task { @MainActor in
+                self.log("appContext: \(decoded.count) Abfahrten via Context")
+                self.departures = decoded
+            }
+        }
+
+        // Trip-Daten vom iPhone in lokale UserDefaults speichern
+        let defaults = UserDefaults(suiteName: "group.com.stefanfriedrich.rnvapp")
+        var tripDataUpdated = false
+        if let tripData = applicationContext["plannedTripData"] as? Data {
+            defaults?.set(tripData, forKey: "plannedTripData")
+            tripDataUpdated = true
+        }
+        if let savedData = applicationContext["savedTripData"] as? Data {
+            defaults?.set(savedData, forKey: "savedTripData")
+            tripDataUpdated = true
+        }
+        if tripDataUpdated {
+            Task { @MainActor in
+                self.log("appContext: Fahrtdaten gespeichert")
+                self.onContextUpdated?()
+            }
         }
 
         if let creds = applicationContext["watchCredentials"] as? [String: Any],
@@ -239,6 +346,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
             )
             Task { @MainActor in
                 WatchDirectService.shared.saveCredentials(credentials)
+                self.log("appContext: Credentials gespeichert (clientID=\(clientID.prefix(8))…)")
                 self.onContextUpdated?()
             }
         }

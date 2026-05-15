@@ -74,9 +74,11 @@ private struct DepartureRow: View {
             )
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(departure.direction)
-                    .font(.caption.bold())
-                    .lineLimit(1)
+                if !departure.direction.isEmpty {
+                    Text(departure.direction)
+                        .font(.caption.bold())
+                        .lineLimit(1)
+                }
 
                 HStack(spacing: 4) {
                     Text(WatchDateHelper.formatTime(displayTime))

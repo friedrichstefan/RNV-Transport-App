@@ -171,14 +171,15 @@ class LiveActivityManager: ObservableObject {
 
             // Beende Activity wenn angekommen
             if isArrived {
-                // Nach 5 Minuten automatisch beenden
+                // Nach 1 Stunde automatisch archivieren und beenden
                 if let arrivalDate = DateFormattingHelper.shared.parseISO8601(attrs.arrivalTimeISO),
-                   now.timeIntervalSince(arrivalDate) > 300 {
+                   now.timeIntervalSince(arrivalDate) > 3600 {
+                    TripDataManager.shared.archiveAndRemoveTripData(for: attrs.tripId)
                     await activity.end(nil, dismissalPolicy: .immediate)
                     activityState.setTripActive(attrs.tripId, isActive: false)
                     activityState.removeTripDataForWidget(tripId: attrs.tripId)
                     #if DEBUG
-                    print("🛑 [BG] Activity beendet (angekommen)")
+                    print("🛑 [BG] Activity archiviert und beendet (1h nach Ankunft)")
                     #endif
                 }
             }
@@ -479,6 +480,15 @@ class LiveActivityManager: ObservableObject {
         let isArrived = formatter.isArrived(arrivalISO, at: now)
         
         let currentPhase: TripPhase = isArrived ? .arrived : (isBeforeDeparture ? .beforeDeparture : .duringJourney)
+
+        // Nach 1 Stunde nach Ankunft: archivieren und beenden
+        if isArrived,
+           let arrivalDate = formatter.parseISO8601(arrivalISO),
+           now.timeIntervalSince(arrivalDate) > 3600 {
+            TripDataManager.shared.archiveAndRemoveTripData(for: trip.id.uuidString)
+            await endActivity(tripId: trip.id.uuidString)
+            return
+        }
         
         guard let currentLeg = getCurrentLeg(for: trip),
               let boardStop = currentLeg.boardStopName,

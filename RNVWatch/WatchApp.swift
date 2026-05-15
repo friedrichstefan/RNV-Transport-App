@@ -18,6 +18,7 @@ struct RNVWatchApp: App {
                     connectivity.onContextUpdated = { [weak dataManager] in
                         dataManager?.refresh()
                     }
+                    connectivity.requestInitialData()
                 }
         }
         .onChange(of: scenePhase) { _, phase in

@@ -8,8 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		2810C6DEC9BFB58944B8614C /* DeparturesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93CBB7CE42CD42C1D4DA5DE4 /* DeparturesView.swift */; };
-		3D35824A9C154C899F753900 /* ConnectionSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */; };
-		CC11DD22EE33FF4400112233 /* WatchStationPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD22EE33FF440011223344CC /* WatchStationPickerView.swift */; };
 		39111F902F1C61A0002FB482 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 39111F8F2F1C61A0002FB482 /* .gitignore */; };
 		395F1FEA2F11B3F700BC7030 /* Apollo in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FE92F11B3F700BC7030 /* Apollo */; };
 		395F1FEC2F11B3F700BC7030 /* ApolloAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 395F1FEB2F11B3F700BC7030 /* ApolloAPI */; };
@@ -17,17 +15,20 @@
 		395F20AC2F128DB500BC7030 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 395F20AB2F128DB500BC7030 /* SwiftUI.framework */; };
 		395F20BB2F128DB700BC7030 /* RNVLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 395F20A72F128DB500BC7030 /* RNVLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		39E6B1792FACFE4900530110 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47AAB2A72D7597E0244DDB50 /* WatchConnectivity.framework */; };
+		3D35824A9C154C899F753900 /* ConnectionSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */; };
 		48B707E0FE2F06C7DF6A565E /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 24A9B46C77197C343CC5C33E /* SwiftUI.framework */; };
 		57EDFA3C7F77AE674225DD28 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4AC99C37BEC617215A2FDE2C /* WatchConnectivity.framework */; };
 		7DBDB4AD9D0DA448A37C48E9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F52290A6F7215AE6A17DA1BC /* Foundation.framework */; };
 		A0E86D8DA9A8B911527223AB /* WatchDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED490D419C9DBE03FAA21B4 /* WatchDataManager.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* WatchDirectService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* WatchDirectService.swift */; };
+		AB12CD34EF56AB12CD34EF56 /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12AB34CD56EF12AB34CD56EF /* DebugView.swift */; };
 		AC15135173E7EB8E1FC05134 /* WatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3586F8F82591C327AC1184D9 /* WatchApp.swift */; };
 		B59AA62002E811D8BC48653B /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2E89EE46FAF298E6247B82 /* WatchConnectivityManager.swift */; };
 		B802ECD0D273B8378428D900 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF3FF46771BC4230A08B904E /* ContentView.swift */; };
 		C3836C4CBF30DE1186B4AC83 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FEB0BED9C1BB7BD41733D19 /* WatchModels.swift */; };
 		C711471A5C4F81491F9F7149 /* SavedTripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C1D454BD4A661DC5B81DDE /* SavedTripsView.swift */; };
 		CC000003000000000000000C /* RNVWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = F50FC19EC7F5F96CA4125341 /* RNVWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CC11DD22EE33FF4400112233 /* WatchStationPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD22EE33FF440011223344CC /* WatchStationPickerView.swift */; };
 		DD1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift */; };
 		EBED6334CFBEED0A06A3FDAD /* ActiveTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F833CF806B9CB3374EC3D0 /* ActiveTripView.swift */; };
 /* End PBXBuildFile section */
@@ -94,6 +95,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		12AB34CD56EF12AB34CD56EF /* DebugView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		24A9B46C77197C343CC5C33E /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS11.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
 		3586F8F82591C327AC1184D9 /* WatchApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchApp.swift; sourceTree = "<group>"; };
 		39111F8D2F1C6108002FB482 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
@@ -111,14 +113,14 @@
 		4FEB0BED9C1BB7BD41733D19 /* WatchModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchModels.swift; sourceTree = "<group>"; };
 		8A6B3F591AE6C55A16B2746B /* RNVWatch.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RNVWatch.entitlements; sourceTree = "<group>"; };
 		93CBB7CE42CD42C1D4DA5DE4 /* DeparturesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeparturesView.swift; sourceTree = "<group>"; };
-		F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConnectionSearchView.swift; sourceTree = "<group>"; };
-		DD22EE33FF440011223344CC /* WatchStationPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchStationPickerView.swift; sourceTree = "<group>"; };
 		9ED490D419C9DBE03FAA21B4 /* WatchDataManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchDataManager.swift; sourceTree = "<group>"; };
 		A8C1D454BD4A661DC5B81DDE /* SavedTripsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedTripsView.swift; sourceTree = "<group>"; };
 		C2F833CF806B9CB3374EC3D0 /* ActiveTripView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActiveTripView.swift; sourceTree = "<group>"; };
+		DD22EE33FF440011223344CC /* WatchStationPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchStationPickerView.swift; sourceTree = "<group>"; };
 		DF3FF46771BC4230A08B904E /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		EE1A2B3C4E5F6A7B8C9D0E1F /* WatchDemoData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchDemoData.swift; sourceTree = "<group>"; };
 		F2E1D0C9B8A7F6E5D4C3B2A1 /* WatchDirectService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchDirectService.swift; sourceTree = "<group>"; };
+		F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConnectionSearchView.swift; sourceTree = "<group>"; };
 		F50FC19EC7F5F96CA4125341 /* RNVWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RNVWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F52290A6F7215AE6A17DA1BC /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS11.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
@@ -219,6 +221,7 @@
 				93CBB7CE42CD42C1D4DA5DE4 /* DeparturesView.swift */,
 				F4AF3F675DCC44B7B2218C1F /* ConnectionSearchView.swift */,
 				DD22EE33FF440011223344CC /* WatchStationPickerView.swift */,
+				12AB34CD56EF12AB34CD56EF /* DebugView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -461,6 +464,7 @@
 				2810C6DEC9BFB58944B8614C /* DeparturesView.swift in Sources */,
 				3D35824A9C154C899F753900 /* ConnectionSearchView.swift in Sources */,
 				CC11DD22EE33FF4400112233 /* WatchStationPickerView.swift in Sources */,
+				AB12CD34EF56AB12CD34EF56 /* DebugView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

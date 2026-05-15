@@ -49,6 +49,7 @@ struct WatchTripWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: WatchTripProvider()) { entry in
             WatchTripWidgetEntryView(entry: entry)
+                .widgetURL(URL(string: "rnv://watch/active-trip"))
         }
         .configurationDisplayName("Nächste Fahrt")
         .description("Zeigt deine nächste ÖPNV-Verbindung.")

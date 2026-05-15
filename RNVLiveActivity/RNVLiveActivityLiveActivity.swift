@@ -19,6 +19,7 @@ struct RNVLiveActivityLiveActivity: Widget {
                 isBeforeDeparture: context.state.phase == .beforeDeparture,
                 currentTime: Date()
             )
+            .widgetURL(URL(string: "rnv://trips/\(context.attributes.tripId)"))
 
         } dynamicIsland: { context in
             DynamicIsland {

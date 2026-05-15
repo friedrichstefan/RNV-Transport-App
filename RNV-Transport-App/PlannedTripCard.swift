@@ -11,9 +11,8 @@ struct PlannedTripCard: View {
     let tripId: String
     let onRemove: () -> Void
 
-    @State private var tripStatus: String = "Aktiv"
-    @State private var isExpanded = false
     @State private var tripData: DetailedTrip?
+    @State private var showDetail = false
     @State private var isPulsing = false
 
     @EnvironmentObject var liveActivityManager: LiveActivityManager
@@ -23,6 +22,7 @@ struct PlannedTripCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Tappable header area
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Live Activity")
@@ -42,22 +42,17 @@ struct PlannedTripCard: View {
 
                 statusBadge
             }
-
-            if let trip = tripData, isExpanded {
-                tripDetailsSection(trip)
-                    .transition(.opacity.combined(with: .scale))
-            }
+            .contentShape(Rectangle())
+            .onTapGesture { showDetail = true }
 
             HStack(spacing: 12) {
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isExpanded.toggle()
-                    }
-                }) {
+                Button {
+                    showDetail = true
+                } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        Image(systemName: "chevron.right")
                             .font(.caption)
-                        Text(isExpanded ? "Weniger" : "Details")
+                        Text("Details")
                             .font(.subheadline)
                     }
                     .foregroundStyle(AppTheme.primaryColor)
@@ -66,9 +61,7 @@ struct PlannedTripCard: View {
                 Spacer()
 
                 Button(action: {
-                    Task {
-                        await handleRemove()
-                    }
+                    Task { await handleRemove() }
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "xmark.circle.fill")
@@ -91,6 +84,14 @@ struct PlannedTripCard: View {
             loadTripData()
             withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
                 isPulsing = true
+            }
+        }
+        .sheet(isPresented: $showDetail) {
+            if let savedData = TripDataManager.shared.getTripData(for: tripId) {
+                PlannedTripDetailSheet(tripId: tripId, tripData: savedData, onEnd: {
+                    Task { await handleRemove() }
+                })
+                .environmentObject(liveActivityManager)
             }
         }
     }
@@ -185,7 +186,7 @@ struct PlannedTripCard: View {
                     .frame(width: 8, height: 8)
             }
 
-            Text(tripStatus)
+            Text("Aktiv")
                 .font(.caption)
                 .fontWeight(.semibold)
                 .foregroundColor(.green)
@@ -195,60 +196,6 @@ struct PlannedTripCard: View {
         .background(
             Capsule().fill(Color.green.opacity(0.12))
         )
-    }
-
-    // MARK: - Trip Details Section
-
-    @ViewBuilder
-    private func tripDetailsSection(_ trip: DetailedTrip) -> some View {
-        VStack(spacing: 8) {
-            Divider()
-
-            HStack {
-                Text("Umsteige:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(trip.interchanges == 0 ? "Direkte Verbindung" : "\(trip.interchanges) Umstieg\(trip.interchanges == 1 ? "" : "e")")
-                    .font(.caption)
-                    .fontWeight(.medium)
-            }
-
-            HStack {
-                Text("Fahrzeit:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(formatter.calculateDuration(start: trip.startTime, end: trip.endTime))
-                    .font(.caption)
-                    .fontWeight(.medium)
-            }
-
-            if trip.legs.count > 1 {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Linien:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    HStack(spacing: 6) {
-                        ForEach(trip.legs.filter { $0.isTimedLeg }, id: \.id) { leg in
-                            if leg.serviceName != nil {
-                                lineBadge(
-                                    serviceType: leg.serviceType,
-                                    serviceName: leg.serviceName,
-                                    fontSize: .system(size: 8, weight: .bold),
-                                    iconFontSize: .system(size: 8),
-                                    horizontalPadding: 4,
-                                    verticalPadding: 2,
-                                    strokeWidth: 1
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .padding(.top, 4)
     }
 
     // MARK: - Actions
@@ -277,25 +224,13 @@ struct PlannedTripCard: View {
                     )
                 }
             )
-            #if DEBUG
-            print("✅ [PLANNED] Trip-Daten geladen für: \(String(tripId.prefix(8)))")
-            #endif
         }
     }
 
     private func handleRemove() async {
-        #if DEBUG
-        print("🛑 [PLANNED] Beende Live Activity für Trip: \(String(tripId.prefix(8)))")
-        #endif
-
         await liveActivityManager.endActivity(tripId: tripId)
         LiveActivityState.shared.setTripActive(tripId, isActive: false)
-        TripDataManager.shared.removeTripData(for: tripId)
-
+        TripDataManager.shared.archiveAndRemoveTripData(for: tripId)
         onRemove()
-
-        #if DEBUG
-        print("✅ [PLANNED] Komplett bereinigt: Live Activity, State und Daten")
-        #endif
     }
 }

@@ -395,10 +395,10 @@ class GraphQLService: ObservableObject {
             print("📡 [GraphQL] Response Status: \(httpResponse.statusCode)")
 #endif
             guard (200...299).contains(httpResponse.statusCode) else {
+                let body = String(data: data.prefix(500), encoding: .utf8) ?? "?"
+                plog("executeQuery: HTTP \(httpResponse.statusCode) – \(body)")
 #if DEBUG
-                if let body = String(data: data, encoding: .utf8) {
-                    print("❌ [GraphQL] Error body (\(httpResponse.statusCode)): \(body)")
-                }
+                print("❌ [GraphQL] Error body (\(httpResponse.statusCode)): \(body)")
 #endif
                 throw GraphQLError(message: "HTTP-Fehler: \(httpResponse.statusCode)")
             }
@@ -775,7 +775,9 @@ class GraphQLService: ObservableObject {
 
         // Primär: native journeys-API mit Auslastung (erfordert hafasID)
         if !station.hafasID.isEmpty {
+            plog("getDepartures: versuche Journeys-API mit hafasID=\(station.hafasID)")
             let journeysResult = await getDeparturesViaJourneys(hafasID: station.hafasID, accessToken: accessToken, time: searchTime)
+            plog("getDepartures: Journeys-API → \(journeysResult.departures.count) Abfahrten, Fehler=\(journeysResult.error ?? "–")")
             if !journeysResult.departures.isEmpty {
                 return journeysResult
             }
@@ -784,11 +786,14 @@ class GraphQLService: ObservableObject {
         // Fallback: hub-workaround (wenn journeys keine Daten liefert)
         let cacheExpired = Self.cachedHubIDsDate.map { Date().timeIntervalSince($0) > Self.hubIDsCacheTTL } ?? true
         if Self.cachedHubIDs.isEmpty || cacheExpired {
+            plog("getDepartures: resolveHubIDs wird ausgeführt")
             await resolveHubIDs(accessToken: accessToken)
+            plog("getDepartures: cachedHubIDs=[\(Self.cachedHubIDs.joined(separator: ","))]")
         }
 
         let hubs = Self.cachedHubIDs.filter { $0 != station.globalID }
         guard !hubs.isEmpty else {
+            plog("getDepartures: keine Hubs verfügbar")
             return DeparturesResult(departures: [], error: "Abfahrtstafel nicht verfügbar")
         }
 
@@ -796,6 +801,7 @@ class GraphQLService: ObservableObject {
 
         for hubID in hubs.prefix(3) {
             let deps = await fetchFirstLegsAsDepartures(from: station.globalID, to: hubID, time: searchTime, accessToken: accessToken)
+            plog("getDepartures: Hub \(hubID) → \(deps.count) Abfahrten")
             allDepartures.append(contentsOf: deps)
         }
 
@@ -874,20 +880,41 @@ class GraphQLService: ObservableObject {
           }
         }
         """
-        guard let data = try? await executeQuery(query: query, accessToken: accessToken),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let data = try? await executeQuery(query: query, accessToken: accessToken) else {
+            plog("resolveStation: executeQuery fehlgeschlagen für '\(name)'")
+            return nil
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let responseData = json["data"] as? [String: Any],
               let stationsObj = responseData["stations"] as? [String: Any],
-              let elements = stationsObj["elements"] as? [[String: Any]]
-        else { return nil }
+              let elements = stationsObj["elements"] as? [[String: Any]] else {
+            let snippet = String(data: data.prefix(300), encoding: .utf8) ?? "?"
+            plog("resolveStation: unerwartete JSON-Struktur – \(snippet)")
+            return nil
+        }
 
+        let foundIDs = elements.compactMap { $0["globalID"] as? String }
+        plog("resolveStation: \(elements.count) Stationen, IDs: \(foundIDs.joined(separator: ","))")
+
+        // Exakter Match zuerst
         for element in elements {
             guard let hafasID = element["hafasID"] as? String,
                   let gID = element["globalID"] as? String,
                   let longName = element["longName"] as? String,
                   gID == globalID else { continue }
+            plog("resolveStation: exakter Match – hafasID=\(hafasID)")
             return Station(hafasID: hafasID, globalID: gID, longName: longName)
         }
+
+        // Fallback: erstes Ergebnis nutzen (hafasID übernehmen, Watch-globalID behalten)
+        if let first = elements.first,
+           let hafasID = first["hafasID"] as? String,
+           !hafasID.isEmpty {
+            plog("resolveStation: kein exakter Match für '\(globalID)', nutze erstes Ergebnis hafasID=\(hafasID)")
+            return Station(hafasID: hafasID, globalID: globalID, longName: name)
+        }
+
+        plog("resolveStation: kein verwendbares Ergebnis gefunden")
         return nil
     }
 
@@ -937,8 +964,14 @@ class GraphQLService: ObservableObject {
         }
         """
 
-        guard let data = try? await executeQuery(query: query, accessToken: accessToken),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let hubData: Data
+        do {
+            hubData = try await executeQuery(query: query, accessToken: accessToken)
+        } catch {
+            plog("fetchFirstLegsAsDepartures: Fehler von=\(originID) zu=\(destID) – \(error.localizedDescription)")
+            return []
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: hubData) as? [String: Any],
               let responseData = json["data"] as? [String: Any],
               let trips = responseData["trips"] as? [[String: Any]]
         else { return [] }
@@ -1057,11 +1090,6 @@ class GraphQLService: ObservableObject {
                       isoString
                     }
                   }
-                  destination {
-                    ... on StopPoint {
-                      stopPointName
-                    }
-                  }
                 }
               }
             }
@@ -1069,11 +1097,16 @@ class GraphQLService: ObservableObject {
         }
         """
 
-        guard let data = try? await executeQuery(query: query, accessToken: accessToken) else {
+        let data: Data
+        do {
+            data = try await executeQuery(query: query, accessToken: accessToken)
+        } catch {
+            plog("getDeparturesViaJourneys: Fehler für hafasID=\(hafasID) – \(error.localizedDescription)")
             return DeparturesResult(departures: [], error: "Netzwerkfehler")
         }
 
         if let gqlError = extractGraphQLErrors(from: data) {
+            plog("getDeparturesViaJourneys: GraphQL-Fehler – \(gqlError.message)")
             return DeparturesResult(departures: [], error: gqlError.message)
         }
 
@@ -1083,8 +1116,12 @@ class GraphQLService: ObservableObject {
               let journeysObj = stationObj["journeys"] as? [String: Any],
               let elements = journeysObj["elements"] as? [[String: Any]]
         else {
+            let snippet = String(data: data.prefix(400), encoding: .utf8) ?? "?"
+            plog("getDeparturesViaJourneys: JSON-Parse fehlgeschlagen – \(snippet)")
             return DeparturesResult(departures: [], error: "Keine Daten")
         }
+
+        plog("getDeparturesViaJourneys: \(elements.count) Journey-Elemente für hafasID=\(hafasID)")
 
         let departures: [Departure] = elements.compactMap { element -> Departure? in
             guard let lineObj = element["line"] as? [String: Any],
@@ -1099,16 +1136,20 @@ class GraphQLService: ObservableObject {
             let realtime = (firstStop["realtimeDeparture"] as? [String: Any])?["isoString"] as? String
             let effectiveRealtime = (realtime == "null" || realtime?.isEmpty == true) ? nil : realtime
 
-            // line.id Format: "rnv:64:H" oder "rnv:S1:H" → letztes Segment vor ":H" oder zweiter Teil
-            let lineName = lineID.split(separator: ":").dropFirst().first.map(String.init) ?? lineID
+            // line.id Format: "rnv:64:H" → ["rnv", "64", "H"]
+            let parts = lineID.split(separator: ":").map(String.init)
+            let lineName = parts.count >= 2 ? parts[1] : lineID
 
-            let destinationName: String
-            if let destObj = element["destination"] as? [String: Any],
-               let name = destObj["stopPointName"] as? String, name != "null" {
-                destinationName = name
-            } else {
-                destinationName = ""
-            }
+            // ServiceType aus Linienname ableiten (RNV-spezifisch)
+            let serviceType: String? = {
+                let n = lineName.uppercased()
+                if n.hasPrefix("S") && n.dropFirst().first?.isNumber == true { return "S_BAHN" }
+                if let num = Int(n), num >= 1, num <= 20 { return "STRASSENBAHN" }
+                return "BUS"
+            }()
+
+            // destination-Feld existiert nicht im Schema – Richtung bleibt leer
+            let destinationName = ""
 
             // Auslastung
             var occupancy: OccupancyLevel? = nil
@@ -1123,7 +1164,7 @@ class GraphQLService: ObservableObject {
                 estimatedDeparture: effectiveRealtime,
                 lineName: lineName,
                 direction: destinationName,
-                serviceType: nil,
+                serviceType: serviceType,
                 occupancy: occupancy
             )
         }

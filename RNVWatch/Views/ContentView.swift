@@ -21,6 +21,14 @@ struct ContentView: View {
             ConnectionSearchView()
                 .tag(3)
                 .tabItem { Label("Suche", systemImage: "magnifyingglass") }
+
+            DebugView()
+                .tag(4)
+                .tabItem { Label("Debug", systemImage: "ladybug") }
+        }
+        .onOpenURL { _ in
+            // Komplikation angetippt → zur aktiven Fahrt navigieren
+            selectedTab = 0
         }
     }
 }
